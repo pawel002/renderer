@@ -1,7 +1,10 @@
+#include <iostream>
+
 #include "camera.h"
 
-Camera::Camera(glm::vec3 position) 
-    : front(glm::vec3(0.0f, 0.0f, 1.0f)), movement_speed(5.0f), mouse_sensitivity(0.1f), roll_speed(2.0f) {
+Camera::Camera(glm::vec3 position) : 
+    position(position), front(glm::vec3(0.0f, 0.0f, 1.0f)), 
+    movement_speed(5.0f), mouse_sensitivity(0.1f), roll_speed(2.0f) {
     position = position;
     world_up = glm::vec3(0.0f, -1.0f, 0.0f); 
     yaw = 90.0f;
@@ -28,7 +31,7 @@ void Camera::processKeyboard(CameraMovement direction, float delta_time) {
     if (direction == ROLL_LEFT || direction == ROLL_RIGHT) {
         float roll_velocity = roll_speed * delta_time;
 
-        if (direction == ROLL_RIGHT) roll_velocity = -roll_velocity;
+        if (direction == ROLL_LEFT) roll_velocity = -roll_velocity;
 
         glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), roll_velocity, front);
         world_up = glm::normalize(glm::vec3(rotationMatrix * glm::vec4(world_up, 0.0f)));
@@ -51,8 +54,6 @@ void Camera::processMouseMovement(float xoffset, float yoffset) {
 }
 
 void Camera::updateCameraVectors() {
-    glm::vec3 front;
-
     front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
     front.y = -sin(glm::radians(pitch)); 
     front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));

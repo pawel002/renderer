@@ -1,3 +1,4 @@
+#include <iostream>
 #include <vector>
 #include <GL/glew.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -115,7 +116,7 @@ void PointCloudRenderer::render(
     float screen_width, float screen_height,
     float base_point_size, float min_point_size, float max_point_size,
     bool show_cameras   
-) {
+) const {
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -135,7 +136,7 @@ void PointCloudRenderer::render(
         renderCameraPoses();
 }
 
-void PointCloudRenderer::renderPoints(float base_size, float min_size, float max_size) {
+void PointCloudRenderer::renderPoints(float base_size, float min_size, float max_size) const {
     glm::mat4 model = glm::mat4(1.0f);
     glUniformMatrix4fv(glGetUniformLocation(shader->ID, "model"), 1, GL_FALSE, glm::value_ptr(model));
     glUniform1i(glGetUniformLocation(shader->ID, "useUniformColor"), 0);
@@ -149,7 +150,7 @@ void PointCloudRenderer::renderPoints(float base_size, float min_size, float max
     glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(point_count));
 }
 
-void PointCloudRenderer::renderCameraPoses() {
+void PointCloudRenderer::renderCameraPoses() const {
     glUniform1i(glGetUniformLocation(shader->ID, "useUniformColor"), 1);
     glUniform1i(glGetUniformLocation(shader->ID, "isInstanced"), 1);
     glUniform3f(glGetUniformLocation(shader->ID, "uniformColor"), 1.0f, 0.0f, 0.0f);
@@ -158,10 +159,10 @@ void PointCloudRenderer::renderCameraPoses() {
     glDrawArraysInstanced(GL_LINES, 0, 16, static_cast<GLsizei>(pose_count));
 }
 
-size_t PointCloudRenderer::getPointCount() {
+size_t PointCloudRenderer::getPointCount() const {
     return point_count;
 }
 
-size_t PointCloudRenderer::getPoseCount() {
+size_t PointCloudRenderer::getPoseCount() const {
     return pose_count;
 }

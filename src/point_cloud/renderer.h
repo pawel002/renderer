@@ -22,10 +22,10 @@ public:
         float screen_width, float screen_height,
         float base_point_size, float min_point_size, float max_point_size,
         bool show_cameras    
-    );
+    ) const;
 
-    size_t getPointCount();
-    size_t getPoseCount();
+    size_t getPointCount() const;
+    size_t getPoseCount() const;
 
 private:
     Shader* shader;
@@ -36,6 +36,6 @@ private:
     size_t point_count, pose_count;
 
     void initCameraGhostGeometry();
-    void renderPoints(float base_size, float min_size, float max_size);
-    void renderCameraPoses();
+    void renderPoints(float base_size, float min_size, float max_size) const;
+    void renderCameraPoses() const;
 };

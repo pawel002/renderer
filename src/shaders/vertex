@@ -1,8 +1,6 @@
 #version 330 core
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aColor;
-
-// Add the instance matrix attribute (occupies locations 2, 3, 4, and 5)
 layout (location = 2) in mat4 instanceMatrix; 
 
 out vec3 vertexColor;

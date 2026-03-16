@@ -56,16 +56,19 @@ int Application::run() {
 
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
+        glViewport(0, 0, width, height);
+
         float screen_width = static_cast<float>(width > 0 ? width : WIDTH_F);
         float screen_height = static_cast<float>(height > 0 ? height : HEIGHT_F);
 
-        if (current_mode == RenderMode::POINT_CLOUD)
+        if (current_mode == RenderMode::POINT_CLOUD) {
             point_cloud_renderer.render(
                 camera,
                 screen_width, screen_height,
                 base_point_size, min_point_size, max_point_size,
                 show_cameras
             );
+        }
 
         if (current_mode == RenderMode::GAUSSIAN_SPLAT) {
             // TODO: render gaussian splatting pipeline
@@ -156,6 +159,9 @@ void Application::renderUI() {
     ImGui::Separator();
     ImGui::Text("Press TAB to toggle UI / Camera Fly Mode");
     ImGui::Separator();
+
+    glm::vec3 camPos = camera.position; 
+    ImGui::Text("Camera Pos: X: %.2f  Y: %.2f  Z: %.2f", camPos.x, camPos.y, camPos.z);
     
     if (ImGui::BeginTabBar("RenderModes")) {
         if (ImGui::BeginTabItem("Point Cloud")) {
