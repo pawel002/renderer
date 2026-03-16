@@ -5,8 +5,8 @@
 #include <vector>
 
 #include "camera/camera.h"
-#include "renderer.h"
-#include "colmap_parser.h"
+#include "point_cloud/renderer.h"
+#include "point_cloud/colmap_parser.h"
 
 class Application {
 public:
@@ -18,34 +18,29 @@ public:
 private:
     GLFWwindow* window;
     Camera camera;
-    Renderer renderer;
+
+    PointCloudRenderer point_cloud_renderer;
     
-    float deltaTime, lastFrame, lastX, lastY;
-    bool firstMouse, uiActive, showCameras;
+    float delta_time, last_frame, last_x, last_y;
+    bool first_mouse, ui_active, show_cameras;
 
     enum class RenderMode {
         POINT_CLOUD,
         GAUSSIAN_SPLAT
     };
 
-    RenderMode currentMode;
+    RenderMode current_mode;
 
-    char pointsPath[256];
-    char imagesPath[256];
-    char splatPath[256];
+    char points_path[256];
+    char images_path[256];
 
-    float basePointSize;
-    float minPointSize;
-    float maxPointSize;
-    
-    std::vector<Vertex> pointCloud;
-    std::vector<CameraPose> cameraPoses;
+    float base_point_size, min_point_size, max_point_size;
+    size_t point_count, pose_count;
 
     bool initGLFW();
     void initImGui();
     void setUIMode(bool active);
-    void loadData();
-    void loadSplatData();
+    void loadPointsData();
     void processInput();
     void renderUI();
     void cleanup();

@@ -6,134 +6,151 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include "splat_parser.h"
 
 using namespace std;
+
+const char* APP_NAME = "3D Renderer";
 
 const char* POINTS_PATH = "data/test2/output2/1/points3D.bin\0";
 const char* IMAGES_PATH = "data/test2/output2/1/images.bin\0";
 const char* SPLAT_PATH = "data/gs-test1/point_cloud.ply\0";
 
+const int WIDTH = 1280;
+const int HEIGHT = 720;
+const float WIDTH_F = static_cast<float>(WIDTH);
+const float HEIGHT_F = static_cast<float>(HEIGHT);
+
+const float BASE_POINTS_SIZE = 25.0f;
+const float MIN_POINTS_SIZE = 1.0f;
+const float MAX_POINTS_SIZE = 20.0f;
+
 Application::Application() 
     : window(nullptr),
-      camera(glm::vec3(0.0f, 0.0f, 5.0f)), deltaTime(0.0f), lastFrame(0.0f), 
-      lastX(1280.0f / 2.0f), lastY(720.0f / 2.0f), firstMouse(true), showCameras(true),
-      uiActive(true), currentMode(RenderMode::POINT_CLOUD), basePointSize(25.0f), minPointSize(1.0f), maxPointSize(20.0f) {
+      camera(glm::vec3(0.0f, 0.0f, 5.0f)), 
+      point_cloud_renderer(),
+      delta_time(0.0f), last_frame(0.0f), last_x(WIDTH_F / 2.0f), last_y(HEIGHT_F / 2.0f),
+      first_mouse(true), ui_active(true), show_cameras(true), 
+      current_mode(RenderMode::POINT_CLOUD), 
+      base_point_size(BASE_POINTS_SIZE), min_point_size(MIN_POINTS_SIZE), max_point_size(MAX_POINTS_SIZE),
+      point_count(0), pose_count(0) {
     
-    strncpy(pointsPath, POINTS_PATH, sizeof(POINTS_PATH));
-    strncpy(imagesPath, IMAGES_PATH, sizeof(IMAGES_PATH));
-    strncpy(splatPath, SPLAT_PATH, sizeof(SPLAT_PATH));
+    strncpy(points_path, POINTS_PATH, sizeof(POINTS_PATH));
+    strncpy(images_path, IMAGES_PATH, sizeof(IMAGES_PATH));
 }
 
 Application::~Application() {
 }
 
-int Application::Run() {
-    if (!InitGLFW()) return -1;
-    InitImGui();
+int Application::run() {
+    if (!initGLFW()) return -1;
+    initImGui();
     
-    renderer.Init();
+    point_cloud_renderer.init();
 
     while (!glfwWindowShouldClose(window)) {
-        float currentFrame = static_cast<float>(glfwGetTime());
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+        float current_frame = static_cast<float>(glfwGetTime());
+        delta_time = current_frame - last_frame;
+        last_frame = current_frame;
 
-        ProcessInput();
+        processInput();
 
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
-        float screenWidth = static_cast<float>(width > 0 ? width : 1280);
-        float screenHeight = static_cast<float>(height > 0 ? height : 720);
+        float screen_width = static_cast<float>(width > 0 ? width : WIDTH_F);
+        float screen_height = static_cast<float>(height > 0 ? height : HEIGHT_F);
 
-        renderer.Render(camera, screenWidth, screenHeight, basePointSize, minPointSize, maxPointSize, showCameras, static_cast<int>(currentMode));
+        if (current_mode == RenderMode::POINT_CLOUD)
+            point_cloud_renderer.render(
+                camera,
+                screen_width, screen_height,
+                base_point_size, min_point_size, max_point_size,
+                show_cameras
+            );
 
-        RenderUI();
+        if (current_mode == RenderMode::GAUSSIAN_SPLAT)
+            // render gaussian splatting pipeline
+
+        renderUI();
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    Cleanup();
+    cleanup();
     return 0;
 }
 
-bool Application::InitGLFW() {
+bool Application::initGLFW() {
     if (!glfwInit()) return false;
+
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = glfwCreateWindow(1280, 720, "COLMAP Renderer", NULL, NULL);
+    window = glfwCreateWindow(WIDTH, HEIGHT, APP_NAME, NULL, NULL);
     if (!window) {
         glfwTerminate();
         return false;
     }
+
     glfwMakeContextCurrent(window);
 
     glfwSetWindowUserPointer(window, this);
-    glfwSetCursorPosCallback(window, MouseCallbackStatic);
-    glfwSetKeyCallback(window, KeyCallbackStatic);
+    glfwSetCursorPosCallback(window, mouseCallbackStatic);
+    glfwSetKeyCallback(window, keyCallbackStatic);
 
     if (glewInit() != GLEW_OK) return false;
     return true;
 }
 
-void Application::InitImGui() {
+void Application::initImGui() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
-    SetUIMode(true); // Start with UI active
+    setUIMode(true);
 }
 
-void Application::SetUIMode(bool active) {
-    uiActive = active;
-    if (uiActive) {
+void Application::setUIMode(bool active) {
+    ui_active = active;
+    if (ui_active) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        firstMouse = true;
-    } else {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        first_mouse = true;
+        return;
     }
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 
-void Application::LoadData() {
-    // Load Points
-    pointCloud = readPoints3D(pointsPath);
-    renderer.UpdatePointCloudData(pointCloud);
+void Application::loadPointsData() {
+    point_cloud_renderer.updatePointCloudData(readPoints3D(points_path));
+    point_cloud_renderer.updateCameraData(readImages(images_path));
 
-    // Load Cameras
-    cameraPoses = readImages(imagesPath);
-    renderer.UpdateCameraData(cameraPoses);
+    point_count = point_cloud_renderer.getPointCount();
+    pose_count = point_cloud_renderer.getPoseCount();
 }
 
-void Application::LoadSplatData() {
-    std::vector<Splat> splats = readGaussianSplats(splatPath);
-    renderer.UpdateSplatData(splats);
-}
-
-void Application::ProcessInput() {
+void Application::processInput() {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    if (uiActive) return; // Don't move camera if typing in UI
+    if (ui_active) return;
 
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) camera.ProcessKeyboard(RIGHT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) camera.ProcessKeyboard(UP, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) camera.ProcessKeyboard(DOWN, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) camera.ProcessKeyboard(ROLL_LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) camera.ProcessKeyboard(ROLL_RIGHT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) camera.processKeyboard(FORWARD, delta_time);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) camera.processKeyboard(BACKWARD, delta_time);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) camera.processKeyboard(LEFT, delta_time);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) camera.processKeyboard(RIGHT, delta_time);
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) camera.processKeyboard(UP, delta_time);
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) camera.processKeyboard(DOWN, delta_time);
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) camera.processKeyboard(ROLL_LEFT, delta_time);
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) camera.processKeyboard(ROLL_RIGHT, delta_time);
 }
 
-void Application::RenderUI() {
+void Application::renderUI() {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::Begin("COLMAP & 3DGS Controls");
+    ImGui::Begin("3D Renderer Controls");
     ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
     ImGui::Separator();
     ImGui::Text("Press TAB to toggle UI / Camera Fly Mode");
@@ -141,37 +158,31 @@ void Application::RenderUI() {
     
     if (ImGui::BeginTabBar("RenderModes")) {
         if (ImGui::BeginTabItem("Point Cloud")) {
-            currentMode = RenderMode::POINT_CLOUD;
+            current_mode = RenderMode::POINT_CLOUD;
             
-            ImGui::InputText("Points Path", pointsPath, IM_ARRAYSIZE(pointsPath));
-            ImGui::InputText("Images Path", imagesPath, IM_ARRAYSIZE(imagesPath));
+            ImGui::InputText("Points Path", points_path, IM_ARRAYSIZE(points_path));
+            ImGui::InputText("Images Path", images_path, IM_ARRAYSIZE(images_path));
             
             if (ImGui::Button("Load Point Cloud Data")) {
-                LoadData();
+                loadPointsData();
             }
 
-            ImGui::Text("Points loaded: %zu", pointCloud.size());
-            ImGui::Text("Cameras loaded: %zu", cameraPoses.size());
+            ImGui::Text("Points loaded: %zu", point_count);
+            ImGui::Text("Cameras loaded: %zu", pose_count);
             
             ImGui::Separator();
             ImGui::Text("Point Cloud Scaling");
-            ImGui::SliderFloat("Base Size", &basePointSize, 1.0f, 100.0f);
-            ImGui::SliderFloat("Min Size", &minPointSize, 0.1f, 5.0f);
-            ImGui::SliderFloat("Max Size", &maxPointSize, 5.0f, 50.0f);
+            ImGui::SliderFloat("Base Size", &base_point_size, 1.0f, 100.0f);
+            ImGui::SliderFloat("Min Size", &min_point_size, 0.1f, 5.0f);
+            ImGui::SliderFloat("Max Size", &max_point_size, 5.0f, 50.0f);
             
             ImGui::EndTabItem();
         }
         
         if (ImGui::BeginTabItem("Gaussian Splatting")) {
-            currentMode = RenderMode::GAUSSIAN_SPLAT;
+            current_mode = RenderMode::GAUSSIAN_SPLAT;
             
-            ImGui::InputText("Splat PLY Path", splatPath, IM_ARRAYSIZE(splatPath));
-            
-            if (ImGui::Button("Load Gaussian Splats")) {
-                LoadSplatData();
-            }
-            
-            ImGui::Text("Splats loaded: %zu", renderer.GetSplatCount());
+            // ADD GAUSSIAN DATA LOADING
             
             ImGui::EndTabItem();
         }
@@ -179,7 +190,7 @@ void Application::RenderUI() {
     }
 
     ImGui::Separator();
-    ImGui::Checkbox("Show Camera Ghosts", &showCameras);
+    ImGui::Checkbox("Show Camera Ghosts", &show_cameras);
 
     ImGui::End();
 
@@ -187,36 +198,36 @@ void Application::RenderUI() {
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-void Application::Cleanup() {
+void Application::cleanup() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
     glfwTerminate();
 }
 
-void Application::MouseCallbackStatic(GLFWwindow* window, double xpos_d, double ypos_d) {
+void Application::mouseCallbackStatic(GLFWwindow* window, double xpos_d, double ypos_d) {
     Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
-    if (app->uiActive || ImGui::GetIO().WantCaptureMouse) return;
+    if (app->ui_active || ImGui::GetIO().WantCaptureMouse) return;
 
     float xpos = static_cast<float>(xpos_d);
     float ypos = static_cast<float>(ypos_d);
-    
-    if (app->firstMouse) {
-        app->lastX = xpos; 
-        app->lastY = ypos;
-        app->firstMouse = false;
+
+    if (app->first_mouse) {
+        app->last_x = xpos; 
+        app->last_y = ypos;
+        app->first_mouse = false;
     }
 
-    float xoffset = xpos - app->lastX;
-    float yoffset = app->lastY - ypos; 
-    app->lastX = xpos; 
-    app->lastY = ypos;
-    app->camera.ProcessMouseMovement(xoffset, yoffset);
+    float xoffset = xpos - app->last_x;
+    float yoffset = app->last_y - ypos; 
+    app->last_x = xpos; 
+    app->last_y = ypos;
+    app->camera.processMouseMovement(xoffset, yoffset);
 }
 
-void Application::KeyCallbackStatic(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void Application::keyCallbackStatic(GLFWwindow* window, int key, int scancode, int action, int mods) {
     Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
     if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        app->SetUIMode(!app->uiActive);
+        app->setUIMode(!app->ui_active);
     }
 }

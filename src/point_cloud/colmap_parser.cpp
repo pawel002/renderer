@@ -1,12 +1,15 @@
-#include "colmap_parser.h"
 #include <fstream>
 #include <iostream>
 
-std::vector<Vertex> readPoints3D(const std::string& filepath) {
-    std::vector<Vertex> vertices;
-    std::ifstream file(filepath, std::ios::binary);
+#include "colmap_parser.h"
+
+using namespace std;
+
+vector<Point> readPoints3D(const string& file_path) {
+    vector<Point> vertices;
+    ifstream file(file_path, ios::binary);
     if (!file.is_open()) {
-        std::cerr << "Failed to open " << filepath << std::endl;
+        cerr << "Failed to open " << file_path << endl;
         return vertices;
     }
 
@@ -30,21 +33,22 @@ std::vector<Vertex> readPoints3D(const std::string& filepath) {
         file.read(reinterpret_cast<char*>(&error), sizeof(double));
         file.read(reinterpret_cast<char*>(&track_length), sizeof(uint64_t));
 
-        file.seekg(track_length * (sizeof(uint32_t) + sizeof(uint32_t)), std::ios::cur);
+        file.seekg(track_length * (sizeof(uint32_t) + sizeof(uint32_t)), ios::cur);
 
-        Vertex v;
+        Point v;
         v.position = glm::vec3(x, y, z);
         v.color = glm::vec3(r / 255.0f, g / 255.0f, b / 255.0f);
         vertices.push_back(v);
     }
+
     return vertices;
 }
 
-std::vector<CameraPose> readImages(const std::string& filepath) {
-    std::vector<CameraPose> poses;
-    std::ifstream file(filepath, std::ios::binary);
+vector<CameraPose> readImages(const string& file_path) {
+    vector<CameraPose> poses;
+    ifstream file(file_path, ios::binary);
     if (!file.is_open()) {
-        std::cerr << "Failed to open " << filepath << std::endl;
+        cerr << "Failed to open " << file_path << endl;
         return poses;
     }
 
@@ -72,7 +76,7 @@ std::vector<CameraPose> readImages(const std::string& filepath) {
 
         uint64_t num_points2D;
         file.read(reinterpret_cast<char*>(&num_points2D), sizeof(uint64_t));
-        file.seekg(num_points2D * (2 * sizeof(double) + sizeof(uint64_t)), std::ios::cur);
+        file.seekg(num_points2D * (2 * sizeof(double) + sizeof(uint64_t)), ios::cur);
 
         glm::quat q(qw, qx, qy, qz);
         glm::mat3 R = glm::mat3_cast(q);
@@ -92,5 +96,6 @@ std::vector<CameraPose> readImages(const std::string& filepath) {
 
         poses.push_back({model});
     }
+    
     return poses;
 }
