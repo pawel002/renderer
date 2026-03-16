@@ -29,6 +29,7 @@ Application::Application()
     : window(nullptr),
       camera(glm::vec3(0.0f, 0.0f, 5.0f)), 
       point_cloud_renderer(),
+      gaussian_renderer(),
       delta_time(0.0f), last_frame(0.0f), last_x(WIDTH_F / 2.0f), last_y(HEIGHT_F / 2.0f),
       first_mouse(true), ui_active(true), show_cameras(true), 
       current_mode(RenderMode::POINT_CLOUD), 
@@ -48,6 +49,7 @@ int Application::run() {
     initImGui();
     
     point_cloud_renderer.init();
+    gaussian_renderer.init();
 
     while (!glfwWindowShouldClose(window)) {
         float current_frame = static_cast<float>(glfwGetTime());
@@ -73,7 +75,10 @@ int Application::run() {
         }
 
         if (current_mode == RenderMode::GAUSSIAN_SPLAT) {
-            // TODO: render gaussian splatting pipeline
+            gaussian_renderer.render(
+                camera,
+                screen_width, screen_height
+            );
         }
 
         renderUI();

@@ -6,8 +6,6 @@
 #include "renderer.h"
 #include "../camera/camera.h"
 
-using namespace std;
-
 PointCloudRenderer::PointCloudRenderer() :
     shader(nullptr),
     points_VAO(0), points_VBO(0),
@@ -29,7 +27,10 @@ PointCloudRenderer::~PointCloudRenderer() {
 }
 
 void PointCloudRenderer::init() {
-    shader = new Shader("src/shaders/vertex", "src/shaders/fragment");
+    shader = new Shader(
+        "src/shaders/point-cloud/vertex", 
+        "src/shaders/point-cloud/fragment"
+    );
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_PROGRAM_POINT_SIZE);
@@ -64,7 +65,7 @@ void PointCloudRenderer::initCameraGhostGeometry() {
     glDisableVertexAttribArray(1); 
 }
 
-void PointCloudRenderer::updatePointCloudData(const vector<Point>& points) {
+void PointCloudRenderer::updatePointCloudData(const std::vector<Point>& points) {
     if (points.empty()) {
         point_count = 0;
         return;
@@ -87,10 +88,10 @@ void PointCloudRenderer::updatePointCloudData(const vector<Point>& points) {
     point_count = points.size();
 }
 
-void PointCloudRenderer::updateCameraData(const vector<CameraPose>& cameras) {
+void PointCloudRenderer::updateCameraData(const std::vector<CameraPose>& cameras) {
     if (cameras.empty()) return;
 
-    vector<glm::mat4> poses;
+    std::vector<glm::mat4> poses;
     poses.reserve(cameras.size());
 
     for (const auto& pose : cameras) {
