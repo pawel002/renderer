@@ -11,9 +11,9 @@ using namespace std;
 
 const char* APP_NAME = "3D Renderer";
 
-const char* POINTS_PATH = "data/test2/output2/1/points3D.bin\0";
-const char* IMAGES_PATH = "data/test2/output2/1/images.bin\0";
-const char* SPLAT_PATH = "data/gs-test1/point_cloud.ply\0";
+const char* POINTS_PATH = "data/test2/output2/1/points3D.bin";
+const char* IMAGES_PATH = "data/test2/output2/1/images.bin";
+const char* SPLAT_PATH = "data/gs-test1/point_cloud.ply";
 
 const int WIDTH = 1280;
 const int HEIGHT = 720;
@@ -34,8 +34,8 @@ Application::Application()
       base_point_size(BASE_POINTS_SIZE), min_point_size(MIN_POINTS_SIZE), max_point_size(MAX_POINTS_SIZE),
       point_count(0), pose_count(0) {
     
-    strncpy(points_path, POINTS_PATH, sizeof(POINTS_PATH));
-    strncpy(images_path, IMAGES_PATH, sizeof(IMAGES_PATH));
+    snprintf(points_path, sizeof(points_path), "%s", POINTS_PATH);
+    snprintf(images_path, sizeof(images_path), "%s", IMAGES_PATH);
 }
 
 Application::~Application() {
@@ -67,8 +67,9 @@ int Application::run() {
                 show_cameras
             );
 
-        if (current_mode == RenderMode::GAUSSIAN_SPLAT)
-            // render gaussian splatting pipeline
+        if (current_mode == RenderMode::GAUSSIAN_SPLAT) {
+            // TODO: render gaussian splatting pipeline
+        }
 
         renderUI();
 
