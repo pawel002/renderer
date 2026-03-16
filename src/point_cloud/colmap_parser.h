@@ -4,7 +4,5 @@
 
 #include "objects.h"
 
-using namespace std;
-
-vector<Point> readPoints3D(const string& file_path);
-vector<CameraPose> readImages(const string& file_path);
+std::vector<Point> readPoints3D(const std::string& file_path);
+std::vector<CameraPose> readImages(const std::string& file_path);

@@ -3,13 +3,12 @@
 
 #include "colmap_parser.h"
 
-using namespace std;
-
-vector<Point> readPoints3D(const string& file_path) {
-    vector<Point> vertices;
-    ifstream file(file_path, ios::binary);
+std::vector<Point> readPoints3D(const std::string& file_path) {
+    std::vector<Point> vertices;
+    std::ifstream file(file_path, std::ios::binary);
+    
     if (!file.is_open()) {
-        cerr << "Failed to open " << file_path << endl;
+        std::cerr << "Failed to open " << file_path << std::endl;
         return vertices;
     }
 
@@ -33,7 +32,7 @@ vector<Point> readPoints3D(const string& file_path) {
         file.read(reinterpret_cast<char*>(&error), sizeof(double));
         file.read(reinterpret_cast<char*>(&track_length), sizeof(uint64_t));
 
-        file.seekg(track_length * (sizeof(uint32_t) + sizeof(uint32_t)), ios::cur);
+        file.seekg(track_length * (sizeof(uint32_t) + sizeof(uint32_t)), std::ios::cur);
 
         Point v;
         v.position = glm::vec3(x, y, z);
@@ -44,11 +43,11 @@ vector<Point> readPoints3D(const string& file_path) {
     return vertices;
 }
 
-vector<CameraPose> readImages(const string& file_path) {
-    vector<CameraPose> poses;
-    ifstream file(file_path, ios::binary);
+std::vector<CameraPose> readImages(const std::string& file_path) {
+    std::vector<CameraPose> poses;
+    std::ifstream file(file_path, std::ios::binary);
     if (!file.is_open()) {
-        cerr << "Failed to open " << file_path << endl;
+        std::cerr << "Failed to open " << file_path << std::endl;
         return poses;
     }
 
@@ -76,7 +75,7 @@ vector<CameraPose> readImages(const string& file_path) {
 
         uint64_t num_points2D;
         file.read(reinterpret_cast<char*>(&num_points2D), sizeof(uint64_t));
-        file.seekg(num_points2D * (2 * sizeof(double) + sizeof(uint64_t)), ios::cur);
+        file.seekg(num_points2D * (2 * sizeof(double) + sizeof(uint64_t)), std::ios::cur);
 
         glm::quat q(qw, qx, qy, qz);
         glm::mat3 R = glm::mat3_cast(q);
@@ -96,6 +95,6 @@ vector<CameraPose> readImages(const string& file_path) {
 
         poses.push_back({model});
     }
-    
+
     return poses;
 }

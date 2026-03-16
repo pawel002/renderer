@@ -7,13 +7,14 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-using namespace std;
+#include "point_cloud/colmap_parser.h"
+#include "gaussian/gaussian_parser.h"
 
 const char* APP_NAME = "3D Renderer";
 
 const char* POINTS_PATH = "data/test2/output2/1/points3D.bin";
 const char* IMAGES_PATH = "data/test2/output2/1/images.bin";
-const char* SPLAT_PATH = "data/gs-test1/point_cloud.ply";
+const char* SPLATS_PATH = "data/gs-test1/point_cloud.ply";
 
 const int WIDTH = 1280;
 const int HEIGHT = 720;
@@ -32,10 +33,11 @@ Application::Application()
       first_mouse(true), ui_active(true), show_cameras(true), 
       current_mode(RenderMode::POINT_CLOUD), 
       base_point_size(BASE_POINTS_SIZE), min_point_size(MIN_POINTS_SIZE), max_point_size(MAX_POINTS_SIZE),
-      point_count(0), pose_count(0) {
+      point_count(0), pose_count(0), splats_count(0) {
     
     snprintf(points_path, sizeof(points_path), "%s", POINTS_PATH);
     snprintf(images_path, sizeof(images_path), "%s", IMAGES_PATH);
+    snprintf(splats_path, sizeof(splats_path), "%s", SPLATS_PATH);
 }
 
 Application::~Application() {
@@ -133,6 +135,12 @@ void Application::loadPointsData() {
     pose_count = point_cloud_renderer.getPoseCount();
 }
 
+void Application::loadSplatsData() {
+    auto splats = readGaussianSplats(splats_path);
+
+    splats_count = splats.size();
+}
+
 void Application::processInput() {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -188,8 +196,14 @@ void Application::renderUI() {
         
         if (ImGui::BeginTabItem("Gaussian Splatting")) {
             current_mode = RenderMode::GAUSSIAN_SPLAT;
+
+            ImGui::InputText("Splats path", splats_path, IM_ARRAYSIZE(splats_path));
             
-            // ADD GAUSSIAN DATA LOADING
+            if (ImGui::Button("Load Gaussian Splat Data")) {
+                loadSplatsData();
+            }
+
+            ImGui::Text("Splats loaded: %zu", splats_count);
             
             ImGui::EndTabItem();
         }
