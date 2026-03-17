@@ -6,6 +6,6 @@ TODO:
 
 - ~~write a bridge between my splats and app data to the cuda rasterization module.~~
 
-- camera is upside down in Gaussian Renderer.
+- ~~camera is upside down in Gaussian Renderer.~~
 
 - fix actual gaussian splats (right now it only shows points).
