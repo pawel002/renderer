@@ -9,3 +9,9 @@ struct Splat {
     glm::vec3 color_dc; 
     float opacity;
 };
+
+struct CameraData {
+    glm::mat4 view;
+    glm::mat4 proj_view;
+    glm::vec3 cam_pos;
+};

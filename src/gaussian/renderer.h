@@ -1,9 +1,10 @@
 #include <vector>
 #include <glm/glm.hpp>
-#include "objects.h"
-#include "../shaders/shader.h"
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
+
+#include "objects.h"
+#include "../shaders/shader.h"
 
 class Camera;
 class Shader;
@@ -18,7 +19,7 @@ public:
     void updateSplats(const std::vector<Splat>& splats);
     void resize(int width, int height);
     void render(
-        Camera& camera,
+        const Camera& camera,
         int screen_width, int screen_height
     );
 
@@ -59,3 +60,5 @@ private:
 
     void allocateCudaBuffer(float** ptr, size_t size);
 };
+
+CameraData calculateProjView(const Camera& camera, float fov_x, float fov_y, float znear = 0.1f, float zfar = 1000.0f);

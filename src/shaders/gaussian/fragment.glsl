@@ -5,7 +5,7 @@ out vec4 FragColor;
 uniform sampler2D renderTex;
 
 void main() {
-    vec2 uv = TexCoords;
+    vec2 uv = vec2(TexCoords.x, 1.0 - TexCoords.y); 
 
     float r = texture(renderTex, vec2(uv.x, uv.y / 3.0)).r;
     float g = texture(renderTex, vec2(uv.x, uv.y / 3.0 + 1.0/3.0)).r;

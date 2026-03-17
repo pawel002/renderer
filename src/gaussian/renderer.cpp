@@ -4,6 +4,7 @@
 #include <cuda_gl_interop.h>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "objects.h"
 #include "renderer.h"
 #include "../camera/camera.h"
 #include "../cuda_rasterizer/rasterizer_impl.h"
@@ -24,7 +25,6 @@ GaussianRenderer::~GaussianRenderer() {
     if (d_img_buffer) cudaFree(d_img_buffer);
     if (d_out_color) cudaFree(d_out_color);
 
-    // Cleanup OpenGL
     if (pbo_resource) cudaGraphicsUnregisterResource(pbo_resource);
     if (pbo) glDeleteBuffers(1, &pbo);
     if (display_texture) glDeleteTextures(1, &display_texture);
@@ -48,25 +48,20 @@ void GaussianRenderer::resize(int width, int height) {
     current_width = width;
     current_height = height;
 
-    // Clean up old resources if they exist
     if (pbo_resource) cudaGraphicsUnregisterResource(pbo_resource);
     if (pbo) glDeleteBuffers(1, &pbo);
     if (display_texture) glDeleteTextures(1, &display_texture);
     if (d_out_color) cudaFree(d_out_color);
 
-    // 1. Reallocate raw CUDA output buffer
     cudaMalloc(&d_out_color, width * height * 3 * sizeof(float));
 
-    // 2. Create OpenGL Pixel Buffer Object (PBO)
     glGenBuffers(1, &pbo);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
     glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 3 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
-    // 3. Register PBO with CUDA
     cudaGraphicsGLRegisterBuffer(&pbo_resource, pbo, cudaGraphicsRegisterFlagsWriteDiscard);
 
-    // 4. Create OpenGL Texture (Single channel GL_R32F, 3x taller to hold CHW format data)
     glGenTextures(1, &display_texture);
     glBindTexture(GL_TEXTURE_2D, display_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height * 3, 0, GL_RED, GL_FLOAT, nullptr);
@@ -124,37 +119,26 @@ void GaussianRenderer::updateSplats(const std::vector<Splat>& splats) {
     allocateCudaBuffer(&d_cam_pos, 3 * sizeof(float));
 }
 
-void GaussianRenderer::render(Camera& camera, int width, int height) {
+void GaussianRenderer::render(const Camera& camera, int width, int height) {
     if (splat_count == 0) return;
 
-    // Automatically catch window resizes without cluttering the main logic
     if (width != current_width || height != current_height) {
         resize(width, height);
     }
 
-    // ==========================================
-    // 1. PREPARE CAMERA & MATRICES 
-    // ==========================================
-    glm::mat4 view = camera.getViewMatrix();
-    glm::mat4 proj = glm::perspective(glm::radians(45.0f), (float)width / height, 0.1f, 1000.0f);
-    
+    float aspect_ratio = (float)width / height;
     float fov_y = glm::radians(45.0f);
-    float fov_x = 2.0f * atan(tan(fov_y * 0.5f) * ((float)width / height));
-
-    glm::mat4 proj_view = proj * view;
-    glm::vec3 cam_pos = camera.position;
+    float fov_x = 2.0f * std::atan(std::tan(fov_y * 0.5f) * aspect_ratio);
+    CameraData cam_data = calculateProjView(camera, fov_x, fov_y);
     
-    cudaMemcpy(d_view, glm::value_ptr(view), 16 * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_proj_view, glm::value_ptr(proj_view), 16 * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_cam_pos, glm::value_ptr(cam_pos), 3 * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_view, glm::value_ptr(cam_data.view), 16 * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_proj_view, glm::value_ptr(cam_data.proj_view), 16 * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_cam_pos, glm::value_ptr(cam_data.cam_pos), 3 * sizeof(float), cudaMemcpyHostToDevice);
 
     auto geomAlloc = [&](size_t size) { if (d_geom_buffer) cudaFree(d_geom_buffer); cudaMalloc((void**)&d_geom_buffer, size); return d_geom_buffer; };
     auto binningAlloc = [&](size_t size) { if (d_binning_buffer) cudaFree(d_binning_buffer); cudaMalloc((void**)&d_binning_buffer, size); return d_binning_buffer; };
     auto imgAlloc = [&](size_t size) { if (d_img_buffer) cudaFree(d_img_buffer); cudaMalloc((void**)&d_img_buffer, size); return d_img_buffer; };
 
-    // ==========================================
-    // 2. RUN CUDA RASTERIZER
-    // ==========================================
     CudaRasterizer::Rasterizer::forward(
         geomAlloc, binningAlloc, imgAlloc, splat_count, 0, 0, d_bg_color, width, height, d_means3D,
         nullptr, d_colors, d_opacities, d_scales, 1.0f, d_rotations, nullptr,
@@ -162,19 +146,14 @@ void GaussianRenderer::render(Camera& camera, int width, int height) {
         tan(fov_x * 0.5f), tan(fov_y * 0.5f), false, d_out_color, nullptr, false, nullptr, false
     );
 
-    // ==========================================
-    // 3. DISPLAY TO OPENGL
-    // ==========================================
     float* d_pbo_ptr;
     size_t num_bytes;
     
-    // Map, copy, and unmap
     cudaGraphicsMapResources(1, &pbo_resource, 0);
     cudaGraphicsResourceGetMappedPointer((void**)&d_pbo_ptr, &num_bytes, pbo_resource);
     cudaMemcpy(d_pbo_ptr, d_out_color, width * height * 3 * sizeof(float), cudaMemcpyDeviceToDevice);
     cudaGraphicsUnmapResources(1, &pbo_resource, 0);
 
-    // Update OpenGL texture from the PBO
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
     
     glActiveTexture(GL_TEXTURE0);
@@ -182,7 +161,6 @@ void GaussianRenderer::render(Camera& camera, int width, int height) {
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height * 3, GL_RED, GL_FLOAT, nullptr);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
-    // Draw the full screen quad!
     shader->use();
     glUniform1i(glGetUniformLocation(shader->ID, "renderTex"), 0);
     
@@ -190,4 +168,18 @@ void GaussianRenderer::render(Camera& camera, int width, int height) {
     glDisable(GL_DEPTH_TEST); 
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glEnable(GL_DEPTH_TEST);
+}
+
+CameraData calculateProjView(const Camera& camera, float fov_x, float fov_y, float znear, float zfar) {
+    glm::mat4 flipYZ = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, -1.0f, -1.0f));
+    glm::mat4 view = flipYZ * camera.getViewMatrix();
+
+    glm::mat4 proj = glm::mat4(0.0f);
+    proj[0][0] = 1.0f / std::tan(fov_x * 0.5f);
+    proj[1][1] = 1.0f / std::tan(fov_y * 0.5f);
+    proj[2][2] = (zfar + znear) / (zfar - znear);
+    proj[2][3] = 1.0f;
+    proj[3][2] = -(2.0f * znear * zfar) / (zfar - znear);
+
+    return { view, proj * view, camera.position };
 }
