@@ -1,8 +1,8 @@
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 #include <glm/gtc/type_ptr.hpp>
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
 
 #include "renderer.h"
 #include "../camera/camera.h"
@@ -32,7 +32,7 @@ GaussianRenderer::~GaussianRenderer() {
 }
 
 void GaussianRenderer::init(int width, int height) {
-    shader = new Shader("src/shaders/gauss.vert", "src/shaders/gauss.frag");
+    shader = new Shader("src/shaders/gaussian/vertex.glsl", "src/shaders/gaussian/fragment.glsl");
     glGenVertexArrays(1, &quad_vao);
     resize(width, height);
 }
@@ -113,10 +113,19 @@ void GaussianRenderer::updateSplats(const std::vector<Splat>& splats) {
 
     allocateCudaBuffer(&d_opacities, opacities.size() * sizeof(float));
     cudaMemcpy(d_opacities, opacities.data(), opacities.size() * sizeof(float), cudaMemcpyHostToDevice);
+
+    // here is the color variable
+    float bg_color[3] = {0.1f, 0.1f, 0.1f};
+    allocateCudaBuffer(&d_bg_color, 3 * sizeof(float));
+    cudaMemcpy(d_bg_color, bg_color, 3 * sizeof(float), cudaMemcpyHostToDevice);
+
+    allocateCudaBuffer(&d_view, 16 * sizeof(float));
+    allocateCudaBuffer(&d_proj_view, 16 * sizeof(float));
+    allocateCudaBuffer(&d_cam_pos, 3 * sizeof(float));
 }
 
 void GaussianRenderer::render(Camera& camera, int width, int height) {
-    if (num_splats == 0) return;
+    if (splat_count == 0) return;
 
     // Automatically catch window resizes without cluttering the main logic
     if (width != current_width || height != current_height) {
@@ -132,10 +141,12 @@ void GaussianRenderer::render(Camera& camera, int width, int height) {
     float fov_y = glm::radians(45.0f);
     float fov_x = 2.0f * atan(tan(fov_y * 0.5f) * ((float)width / height));
 
-    float bg_color[3] = {0.1f, 0.1f, 0.1f};
-    float* d_bg_color;
-    cudaMalloc(&d_bg_color, 3 * sizeof(float));
-    cudaMemcpy(d_bg_color, bg_color, 3 * sizeof(float), cudaMemcpyHostToDevice);
+    glm::mat4 proj_view = proj * view;
+    glm::vec3 cam_pos = camera.position;
+    
+    cudaMemcpy(d_view, glm::value_ptr(view), 16 * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_proj_view, glm::value_ptr(proj_view), 16 * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_cam_pos, glm::value_ptr(cam_pos), 3 * sizeof(float), cudaMemcpyHostToDevice);
 
     auto geomAlloc = [&](size_t size) { if (d_geom_buffer) cudaFree(d_geom_buffer); cudaMalloc((void**)&d_geom_buffer, size); return d_geom_buffer; };
     auto binningAlloc = [&](size_t size) { if (d_binning_buffer) cudaFree(d_binning_buffer); cudaMalloc((void**)&d_binning_buffer, size); return d_binning_buffer; };
@@ -145,13 +156,11 @@ void GaussianRenderer::render(Camera& camera, int width, int height) {
     // 2. RUN CUDA RASTERIZER
     // ==========================================
     CudaRasterizer::Rasterizer::forward(
-        geomAlloc, binningAlloc, imgAlloc, num_splats, 0, 0, d_bg_color, width, height, d_means3D,
+        geomAlloc, binningAlloc, imgAlloc, splat_count, 0, 0, d_bg_color, width, height, d_means3D,
         nullptr, d_colors, d_opacities, d_scales, 1.0f, d_rotations, nullptr,
-        glm::value_ptr(view), glm::value_ptr(proj), glm::value_ptr(camera.position),
+        d_view, d_proj_view, d_cam_pos,
         tan(fov_x * 0.5f), tan(fov_y * 0.5f), false, d_out_color, nullptr, false, nullptr, false
     );
-
-    cudaFree(d_bg_color);
 
     // ==========================================
     // 3. DISPLAY TO OPENGL
@@ -167,12 +176,16 @@ void GaussianRenderer::render(Camera& camera, int width, int height) {
 
     // Update OpenGL texture from the PBO
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
+    
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, display_texture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height * 3, GL_RED, GL_FLOAT, nullptr);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
     // Draw the full screen quad!
     shader->use();
+    glUniform1i(glGetUniformLocation(shader->ID, "renderTex"), 0);
+    
     glBindVertexArray(quad_vao);
     glDisable(GL_DEPTH_TEST); 
     glDrawArrays(GL_TRIANGLES, 0, 3);

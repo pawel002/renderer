@@ -1,8 +1,9 @@
 #include <vector>
 #include <glm/glm.hpp>
-
 #include "objects.h"
 #include "../shaders/shader.h"
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
 
 class Camera;
 class Shader;
@@ -38,6 +39,12 @@ private:
     char* d_binning_buffer = nullptr;
     char* d_img_buffer = nullptr;
 
+    // CUDA runtime auxiliary objects
+    float* d_bg_color = nullptr;
+    float* d_view = nullptr;
+    float* d_proj_view = nullptr;
+    float* d_cam_pos = nullptr;
+
     // Output and Interop
     float *d_out_color = nullptr;
     GLuint pbo = 0;
@@ -48,7 +55,7 @@ private:
     int current_width = 0;
     int current_height = 0;
 
-    size_t splat_count;
+    size_t splat_count = 0;
 
     void allocateCudaBuffer(float** ptr, size_t size);
 };

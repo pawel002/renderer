@@ -28,8 +28,8 @@ PointCloudRenderer::~PointCloudRenderer() {
 
 void PointCloudRenderer::init() {
     shader = new Shader(
-        "src/shaders/point-cloud/vertex", 
-        "src/shaders/point-cloud/fragment"
+        "src/shaders/point-cloud/vertex.glsl", 
+        "src/shaders/point-cloud/fragment.glsl"
     );
 
     glEnable(GL_DEPTH_TEST);

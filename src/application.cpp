@@ -14,7 +14,7 @@ const char* APP_NAME = "3D Renderer";
 
 const char* POINTS_PATH = "data/test2/output2/1/points3D.bin";
 const char* IMAGES_PATH = "data/test2/output2/1/images.bin";
-const char* SPLATS_PATH = "data/gs-test1/point_cloud.ply";
+const char* SPLATS_PATH = "data/gs-test2/point_cloud.ply";
 
 const int WIDTH = 1280;
 const int HEIGHT = 720;
@@ -49,7 +49,7 @@ int Application::run() {
     initImGui();
     
     point_cloud_renderer.init();
-    gaussian_renderer.init();
+    gaussian_renderer.init(WIDTH, HEIGHT);
 
     while (!glfwWindowShouldClose(window)) {
         float current_frame = static_cast<float>(glfwGetTime());
@@ -61,6 +61,9 @@ int Application::run() {
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         glViewport(0, 0, width, height);
+        
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         float screen_width = static_cast<float>(width > 0 ? width : WIDTH_F);
         float screen_height = static_cast<float>(height > 0 ? height : HEIGHT_F);
@@ -142,7 +145,7 @@ void Application::loadPointsData() {
 
 void Application::loadSplatsData() {
     auto splats = readGaussianSplats(splats_path);
-
+    gaussian_renderer.updateSplats(splats);
     splats_count = splats.size();
 }
 
