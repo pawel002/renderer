@@ -4,6 +4,8 @@
 
 #include "gaussian_parser.h"
 
+const float SH_C0 = 0.28209479177387814f;
+
 std::vector<Splat> readGaussianSplats(const std::string& file_path) {
     std::vector<Splat> splats;
     std::ifstream file(file_path, std::ios::binary);
@@ -57,13 +59,27 @@ std::vector<Splat> readGaussianSplats(const std::string& file_path) {
     int idxX = getPropertyIndex("x");
     int idxY = getPropertyIndex("y");
     int idxZ = getPropertyIndex("z");
+
     int idxDC0 = getPropertyIndex("f_dc_0");
     int idxDC1 = getPropertyIndex("f_dc_1");
     int idxDC2 = getPropertyIndex("f_dc_2");
+
     int idxOpac = getPropertyIndex("opacity");
+
     int idxScale0 = getPropertyIndex("scale_0");
     int idxScale1 = getPropertyIndex("scale_1");
     int idxScale2 = getPropertyIndex("scale_2");
+
+    int idxRest0 = getPropertyIndex("f_rest_0");
+    int idxRest1 = getPropertyIndex("f_rest_1");
+    int idxRest2 = getPropertyIndex("f_rest_2");
+    int idxRest3 = getPropertyIndex("f_rest_3");
+    int idxRest4 = getPropertyIndex("f_rest_4");
+    int idxRest5 = getPropertyIndex("f_rest_5");
+    int idxRest6 = getPropertyIndex("f_rest_6");
+    int idxRest7 = getPropertyIndex("f_rest_7");
+    int idxRest8 = getPropertyIndex("f_rest_8");
+
     int idxRot0 = getPropertyIndex("rot_0");
     int idxRot1 = getPropertyIndex("rot_1");
     int idxRot2 = getPropertyIndex("rot_2");
@@ -78,12 +94,22 @@ std::vector<Splat> readGaussianSplats(const std::string& file_path) {
         Splat splat;
         splat.position = glm::vec3(vertexData[idxX], vertexData[idxY], vertexData[idxZ]);
         
-        const float SH_C0 = 0.28209479177387814f;
         splat.color_dc = glm::vec3(
             std::fmax(0.0f, std::fmin(1.0f, vertexData[idxDC0] * SH_C0 + 0.5f)),
             std::fmax(0.0f, std::fmin(1.0f, vertexData[idxDC1] * SH_C0 + 0.5f)),
             std::fmax(0.0f, std::fmin(1.0f, vertexData[idxDC2] * SH_C0 + 0.5f))
         );
+
+        // splat.color_dc = glm::vec3(vertexData[idxDC0], vertexData[idxDC1], vertexData[idxDC2]);
+        // splat.color_rest.push_back(vertexData[idxRest0]);
+        // splat.color_rest.push_back(vertexData[idxRest3]);
+        // splat.color_rest.push_back(vertexData[idxRest6]);
+        // splat.color_rest.push_back(vertexData[idxRest1]);
+        // splat.color_rest.push_back(vertexData[idxRest4]);
+        // splat.color_rest.push_back(vertexData[idxRest7]);
+        // splat.color_rest.push_back(vertexData[idxRest2]);
+        // splat.color_rest.push_back(vertexData[idxRest5]);
+        // splat.color_rest.push_back(vertexData[idxRest8]);
 
         float opacity = vertexData[idxOpac];
         splat.opacity = 1.0f / (1.0f + std::exp(-opacity));
@@ -96,6 +122,7 @@ std::vector<Splat> readGaussianSplats(const std::string& file_path) {
 
         glm::quat q(vertexData[idxRot0], vertexData[idxRot1], vertexData[idxRot2], vertexData[idxRot3]);
         splat.rotation = glm::normalize(q);
+
         splats.push_back(splat);
     }
 

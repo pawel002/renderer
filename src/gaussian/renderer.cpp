@@ -4,13 +4,14 @@
 #include <cuda_gl_interop.h>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <fstream>
+
 #include "objects.h"
 #include "renderer.h"
 #include "../camera/camera.h"
 #include "../cuda_rasterizer/rasterizer_impl.h"
 
-GaussianRenderer::GaussianRenderer() :
-    shader(nullptr) { }
+GaussianRenderer::GaussianRenderer() { }
 
 GaussianRenderer::~GaussianRenderer() {
     if (shader) delete shader;
@@ -37,7 +38,7 @@ void GaussianRenderer::init(int width, int height) {
     resize(width, height);
 }
 
-void GaussianRenderer::allocateCudaBuffer(float** ptr, size_t size) {
+void GaussianRenderer::allocateCudaBuffer(void** ptr, size_t size) {
     if (*ptr) cudaFree(*ptr);
     cudaMalloc((void**)ptr, size);
 }
@@ -52,8 +53,12 @@ void GaussianRenderer::resize(int width, int height) {
     if (pbo) glDeleteBuffers(1, &pbo);
     if (display_texture) glDeleteTextures(1, &display_texture);
     if (d_out_color) cudaFree(d_out_color);
+    if (d_invdepth) cudaFree(d_invdepth);
 
     cudaMalloc(&d_out_color, width * height * 3 * sizeof(float));
+
+    cudaMalloc(&d_invdepth, width * height * sizeof(float));
+    cudaMemset(d_invdepth, 0, width * height * sizeof(float));
 
     glGenBuffers(1, &pbo);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
@@ -76,47 +81,75 @@ void GaussianRenderer::updateSplats(const std::vector<Splat>& splats) {
     std::vector<float> means3D(splat_count * 3);
     std::vector<float> scales(splat_count * 3);
     std::vector<float> rotations(splat_count * 4);
-    std::vector<float> colors(splat_count * 3);
     std::vector<float> opacities(splat_count);
+    std::vector<float> colors(splat_count * 3);
 
     for (int i = 0; i < splat_count; i++) {
         const auto& s = splats[i];
         
-        means3D[i*3 + 0] = s.position.x; means3D[i*3 + 1] = s.position.y; means3D[i*3 + 2] = s.position.z;
+        means3D[i*3 + 0] = s.position.x; 
+        means3D[i*3 + 1] = s.position.y; 
+        means3D[i*3 + 2] = s.position.z;
         
-        scales[i*3 + 0] = s.scale.x; scales[i*3 + 1] = s.scale.y; scales[i*3 + 2] = s.scale.z;
+        scales[i*3 + 0] = s.scale.x; 
+        scales[i*3 + 1] = s.scale.y; 
+        scales[i*3 + 2] = s.scale.z;
         
-        rotations[i*4 + 0] = s.rotation.w; rotations[i*4 + 1] = s.rotation.x; 
-        rotations[i*4 + 2] = s.rotation.y; rotations[i*4 + 3] = s.rotation.z;
+        rotations[i*4 + 0] = s.rotation.x; 
+        rotations[i*4 + 1] = s.rotation.y; 
+        rotations[i*4 + 2] = s.rotation.z; 
+        rotations[i*4 + 3] = s.rotation.w;
         
-        colors[i*3 + 0] = s.color_dc.x; colors[i*3 + 1] = s.color_dc.y; colors[i*3 + 2] = s.color_dc.z;
-        
-        opacities[i] = s.opacity;
+        opacities[i] = 1.0f;
+
+        colors[i*3 + 0] = s.color_dc.x;
+        colors[i*3 + 1] = s.color_dc.y;
+        colors[i*3 + 2] = s.color_dc.z;
+
+        // colors[i*3 + 3] = s.color_rest[0];
+        // colors[i*3 + 4] = s.color_rest[1];
+        // colors[i*3 + 5] = s.color_rest[2];
+        // colors[i*3 + 6] = s.color_rest[3];
+        // colors[i*3 + 7] = s.color_rest[4];
+        // colors[i*3 + 8] = s.color_rest[5];
+        // colors[i*3 + 9] = s.color_rest[6];
+        // colors[i*3 + 10] = s.color_rest[7];
+        // colors[i*3 + 11] = s.color_rest[8];
+
     }
 
-    allocateCudaBuffer(&d_means3D, means3D.size() * sizeof(float));
+    std::cout << splats[0] << std::endl;
+
+    // Allocate and copy data to CUDA
+    allocateCudaBuffer((void**)&d_means3D, means3D.size() * sizeof(float));
     cudaMemcpy(d_means3D, means3D.data(), means3D.size() * sizeof(float), cudaMemcpyHostToDevice);
 
-    allocateCudaBuffer(&d_scales, scales.size() * sizeof(float));
+    allocateCudaBuffer((void**)&d_scales, scales.size() * sizeof(float));
     cudaMemcpy(d_scales, scales.data(), scales.size() * sizeof(float), cudaMemcpyHostToDevice);
 
-    allocateCudaBuffer(&d_rotations, rotations.size() * sizeof(float));
+    allocateCudaBuffer((void**)&d_rotations, rotations.size() * sizeof(float));
     cudaMemcpy(d_rotations, rotations.data(), rotations.size() * sizeof(float), cudaMemcpyHostToDevice);
 
-    allocateCudaBuffer(&d_colors, colors.size() * sizeof(float));
+    allocateCudaBuffer((void**)&d_opacities, opacities.size() * sizeof(float));
+    cudaMemcpy(d_opacities, opacities.data(), opacities.size() * sizeof(float), cudaMemcpyHostToDevice);
+
+    allocateCudaBuffer((void**)&d_colors, colors.size() * sizeof(float));
     cudaMemcpy(d_colors, colors.data(), colors.size() * sizeof(float), cudaMemcpyHostToDevice);
 
-    allocateCudaBuffer(&d_opacities, opacities.size() * sizeof(float));
-    cudaMemcpy(d_opacities, opacities.data(), opacities.size() * sizeof(float), cudaMemcpyHostToDevice);
+    allocateCudaBuffer((void**)&d_radii, splat_count * sizeof(int));
+    cudaMemset(d_radii, 0, splat_count * sizeof(int));
+
+    allocateCudaBuffer((void**)&d_conv3d, 6 * splat_count * sizeof(float));
+    cudaMemset(d_conv3d, 1.0f, 6 * splat_count * sizeof(float));
 
     // here is the color variable
     float bg_color[3] = {0.1f, 0.1f, 0.1f};
-    allocateCudaBuffer(&d_bg_color, 3 * sizeof(float));
+    allocateCudaBuffer((void**)&d_bg_color, 3 * sizeof(float));
     cudaMemcpy(d_bg_color, bg_color, 3 * sizeof(float), cudaMemcpyHostToDevice);
 
-    allocateCudaBuffer(&d_view, 16 * sizeof(float));
-    allocateCudaBuffer(&d_proj_view, 16 * sizeof(float));
-    allocateCudaBuffer(&d_cam_pos, 3 * sizeof(float));
+    allocateCudaBuffer((void**)&d_view, 16 * sizeof(float));
+    allocateCudaBuffer((void**)&d_proj_view, 16 * sizeof(float));
+    allocateCudaBuffer((void**)&d_cam_pos, 3 * sizeof(float));
 }
 
 void GaussianRenderer::render(const Camera& camera, int width, int height) {
@@ -140,11 +173,31 @@ void GaussianRenderer::render(const Camera& camera, int width, int height) {
     auto imgAlloc = [&](size_t size) { if (d_img_buffer) cudaFree(d_img_buffer); cudaMalloc((void**)&d_img_buffer, size); return d_img_buffer; };
 
     CudaRasterizer::Rasterizer::forward(
-        geomAlloc, binningAlloc, imgAlloc, splat_count, 0, 0, d_bg_color, width, height, d_means3D,
-        nullptr, d_colors, d_opacities, d_scales, 1.0f, d_rotations, nullptr,
-        d_view, d_proj_view, d_cam_pos,
-        tan(fov_x * 0.5f), tan(fov_y * 0.5f), false, d_out_color, nullptr, false, nullptr, false
+        geomAlloc, binningAlloc, imgAlloc, 
+        splat_count, 1, 4, 
+        d_bg_color, 
+        width, height, 
+        d_means3D,
+        nullptr, 
+        d_colors, 
+        d_opacities, 
+        d_scales, 
+        10000.0f, 
+        d_rotations, 
+        d_conv3d,
+        d_view, 
+        d_proj_view, 
+        d_cam_pos,
+        tan(fov_x * 0.5f), tan(fov_y * 0.5f), 
+        false, 
+        d_out_color, 
+        d_invdepth, 
+        false, 
+        d_radii, 
+        true
     );
+
+    // save_cuda_image_ppm(d_out_color, width, height, "image.ppm");
 
     float* d_pbo_ptr;
     size_t num_bytes;
@@ -182,4 +235,50 @@ CameraData calculateProjView(const Camera& camera, float fov_x, float fov_y, flo
     proj[3][2] = -(2.0f * znear * zfar) / (zfar - znear);
 
     return { view, proj * view, camera.position };
+}
+
+void GaussianRenderer::save_image(const std::string& filename) const {
+    int total_pixels = current_width * current_height;
+    int total_elements = total_pixels * 3;
+    size_t byte_size = total_elements * sizeof(float);
+
+    // 1. Allocate host memory to receive the float data
+    std::vector<float> h_image(total_elements);
+
+    // 2. Copy data from GPU to CPU
+    cudaError_t err = cudaMemcpy(h_image.data(), d_out_color, byte_size, cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA memcpy failed: " << cudaGetErrorString(err) << std::endl;
+        return;
+    }
+
+    // 3. Open the output file as a standard text file
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return;
+    }
+
+    // 4. Write the P3 header (P3 = ASCII plain text RGB)
+    file << "P3\n" << current_width << " " << current_height << "\n255\n";
+
+    // 5. Convert [0.0, 1.0] floats to [0, 255] integers and write as text
+    for (int i = 0; i < total_pixels; ++i) {
+        // Extract using planar [3, H, W] indexing
+        // R is in the first block, G in the second, B in the third
+        float r_f = std::fmax(0.0f, std::fmin(1.0f, h_image[i]));
+        float g_f = std::fmax(0.0f, std::fmin(1.0f, h_image[total_pixels + i]));
+        float b_f = std::fmax(0.0f, std::fmin(1.0f, h_image[2 * total_pixels + i]));
+
+        // Round to nearest integer
+        int r = static_cast<int>(std::round(r_f * 255.0f));
+        int g = static_cast<int>(std::round(g_f * 255.0f));
+        int b = static_cast<int>(std::round(b_f * 255.0f));
+
+        // Write normal numbers separated by spaces, with a newline per pixel
+        file << r << " " << g << " " << b << "\n";
+    }
+
+    file.close();
+    std::cout << "Successfully saved ASCII PPM image to " << filename << std::endl;
 }

@@ -212,6 +212,10 @@ void Application::renderUI() {
             }
 
             ImGui::Text("Splats loaded: %zu", splats_count);
+
+            if (ImGui::Button("Render Image to PPM")) {
+                gaussian_renderer.save_image("image.ppm");
+            }
             
             ImGui::EndTabItem();
         }

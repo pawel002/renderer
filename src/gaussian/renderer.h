@@ -22,11 +22,11 @@ public:
         const Camera& camera,
         int screen_width, int screen_height
     );
-
+    void save_image(const std::string& filename) const;
     size_t getSplatCount() const;
 
 private:
-    Shader* shader;
+    Shader* shader = nullptr;
 
     // CUDA Device Pointers (Splat Data)
     float *d_means3D = nullptr;
@@ -34,6 +34,9 @@ private:
     float *d_rotations = nullptr;
     float *d_colors = nullptr;
     float *d_opacities = nullptr;
+    float *d_invdepth = nullptr;
+    float *d_conv3d = nullptr;
+    int *d_radii = nullptr;
     
     // CUDA workspace buffers
     char* d_geom_buffer = nullptr;
@@ -58,7 +61,7 @@ private:
 
     size_t splat_count = 0;
 
-    void allocateCudaBuffer(float** ptr, size_t size);
+    void allocateCudaBuffer(void** ptr, size_t size);
 };
 
-CameraData calculateProjView(const Camera& camera, float fov_x, float fov_y, float znear = 0.1f, float zfar = 1000.0f);
+CameraData calculateProjView(const Camera& camera, float fov_x, float fov_y, float znear = 0.01f, float zfar = 100.0f);

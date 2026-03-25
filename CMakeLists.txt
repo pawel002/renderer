@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.24)
 project(Renderer3D LANGUAGES CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -14,6 +14,9 @@ find_package(CUDAToolkit REQUIRED)
 file(GLOB_RECURSE SRC_FILES "src/*.cpp" "src/*.cu")
 
 add_executable(Renderer3D main.cpp ${SRC_FILES})
+
+set_target_properties(Renderer3D PROPERTIES CUDA_ARCHITECTURES "native")
+
 target_link_libraries(Renderer3D PRIVATE 
     glfw 
     GLEW::GLEW 

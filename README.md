@@ -8,4 +8,4 @@ TODO:
 
 - ~~camera is upside down in Gaussian Renderer.~~
 
-- fix actual gaussian splats (right now it only shows points).
+- fix actual gaussian splats (right now it only shows points). investigate more: https://gitlab.inria.fr/sibr/sibr_core/-/blob/gaussian_code_release/src/projects/gaussianviewer/apps/gaussianViewer/main.cpp

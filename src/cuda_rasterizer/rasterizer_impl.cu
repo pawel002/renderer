@@ -247,7 +247,7 @@ int CudaRasterizer::Rasterizer::forward(
 	}
 
 	// Run preprocessing per-Gaussian (transformation, bounding, conversion of SHs to RGB)
-	CHECK_CUDA(FORWARD::preprocess(
+	CHECK_CUDA(FOARD::preprocess(
 		P, D, M,
 		means3D,
 		(glm::vec3*)scales,
