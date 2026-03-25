@@ -11,7 +11,34 @@
 #include "../camera/camera.h"
 #include "../cuda_rasterizer/rasterizer_impl.h"
 
-GaussianRenderer::GaussianRenderer() { }
+GaussianRenderer::GaussianRenderer() {
+    geomAlloc = [this](size_t size) { 
+        if (!d_geom_buffer || size > allocated_geom_size) {
+            if (d_geom_buffer) cudaFree(d_geom_buffer);
+            cudaMalloc((void**)&d_geom_buffer, size);
+            allocated_geom_size = size;
+        }
+        return d_geom_buffer; 
+    };
+    
+    binningAlloc = [this](size_t size) { 
+        if (!d_binning_buffer || size > allocated_binning_size) {
+            if (d_binning_buffer) cudaFree(d_binning_buffer);
+            cudaMalloc((void**)&d_binning_buffer, size);
+            allocated_binning_size = size;
+        }
+        return d_binning_buffer; 
+    };
+    
+    imgAlloc = [this](size_t size) { 
+        if (!d_img_buffer || size > allocated_img_size) {
+            if (d_img_buffer) cudaFree(d_img_buffer);
+            cudaMalloc((void**)&d_img_buffer, size);
+            allocated_img_size = size;
+        }
+        return d_img_buffer; 
+    };
+}
 
 GaussianRenderer::~GaussianRenderer() {
     if (shader) delete shader;
@@ -24,7 +51,6 @@ GaussianRenderer::~GaussianRenderer() {
     if (d_geom_buffer) cudaFree(d_geom_buffer);
     if (d_binning_buffer) cudaFree(d_binning_buffer);
     if (d_img_buffer) cudaFree(d_img_buffer);
-    if (d_out_color) cudaFree(d_out_color);
 
     if (pbo_resource) cudaGraphicsUnregisterResource(pbo_resource);
     if (pbo) glDeleteBuffers(1, &pbo);
@@ -52,9 +78,6 @@ void GaussianRenderer::resize(int width, int height) {
     if (pbo_resource) cudaGraphicsUnregisterResource(pbo_resource);
     if (pbo) glDeleteBuffers(1, &pbo);
     if (display_texture) glDeleteTextures(1, &display_texture);
-    if (d_out_color) cudaFree(d_out_color);
-
-    cudaMalloc(&d_out_color, width * height * 3 * sizeof(float));
 
     glGenBuffers(1, &pbo);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
@@ -126,9 +149,10 @@ void GaussianRenderer::updateSplats(const std::vector<Splat>& splats) {
     allocateCudaBuffer((void**)&d_bg_color, 3 * sizeof(float));
     cudaMemcpy(d_bg_color, bg_color, 3 * sizeof(float), cudaMemcpyHostToDevice);
 
-    allocateCudaBuffer((void**)&d_view, 16 * sizeof(float));
-    allocateCudaBuffer((void**)&d_proj_view, 16 * sizeof(float));
-    allocateCudaBuffer((void**)&d_cam_pos, 3 * sizeof(float));
+    allocateCudaBuffer((void**)&d_cam_params, 35 * sizeof(float));
+    d_view = d_cam_params;
+    d_proj_view = d_cam_params + 16;
+    d_cam_pos = d_cam_params + 32;
 }
 
 void GaussianRenderer::render(const Camera& camera, int width, int height, float scale_modifier) {
@@ -143,13 +167,18 @@ void GaussianRenderer::render(const Camera& camera, int width, int height, float
     float fov_x = 2.0f * std::atan(std::tan(fov_y * 0.5f) * aspect_ratio);
     CameraData cam_data = calculateProjView(camera, fov_x, fov_y);
     
-    cudaMemcpy(d_view, glm::value_ptr(cam_data.view), 16 * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_proj_view, glm::value_ptr(cam_data.proj_view), 16 * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_cam_pos, glm::value_ptr(cam_data.cam_pos), 3 * sizeof(float), cudaMemcpyHostToDevice);
+    float cam_params[35];
+    std::memcpy(cam_params, glm::value_ptr(cam_data.view), 16 * sizeof(float));
+    std::memcpy(cam_params + 16, glm::value_ptr(cam_data.proj_view), 16 * sizeof(float));
+    std::memcpy(cam_params + 32, glm::value_ptr(cam_data.cam_pos), 3 * sizeof(float));
+    
+    cudaMemcpy(d_cam_params, cam_params, 35 * sizeof(float), cudaMemcpyHostToDevice);
 
-    auto geomAlloc = [&](size_t size) { if (d_geom_buffer) cudaFree(d_geom_buffer); cudaMalloc((void**)&d_geom_buffer, size); return d_geom_buffer; };
-    auto binningAlloc = [&](size_t size) { if (d_binning_buffer) cudaFree(d_binning_buffer); cudaMalloc((void**)&d_binning_buffer, size); return d_binning_buffer; };
-    auto imgAlloc = [&](size_t size) { if (d_img_buffer) cudaFree(d_img_buffer); cudaMalloc((void**)&d_img_buffer, size); return d_img_buffer; };
+    float* d_pbo_ptr;
+    size_t num_bytes;
+    
+    cudaGraphicsMapResources(1, &pbo_resource, 0);
+    cudaGraphicsResourceGetMappedPointer((void**)&d_pbo_ptr, &num_bytes, pbo_resource);
 
     CudaRasterizer::Rasterizer::forward(
         geomAlloc, binningAlloc, imgAlloc, 
@@ -169,19 +198,13 @@ void GaussianRenderer::render(const Camera& camera, int width, int height, float
         d_cam_pos,
         tan(fov_x * 0.5f), tan(fov_y * 0.5f),  
         false, 
-        d_out_color, 
+        d_pbo_ptr, 
         nullptr, 
         false, 
         nullptr, 
         true
     );
 
-    float* d_pbo_ptr;
-    size_t num_bytes;
-    
-    cudaGraphicsMapResources(1, &pbo_resource, 0);
-    cudaGraphicsResourceGetMappedPointer((void**)&d_pbo_ptr, &num_bytes, pbo_resource);
-    cudaMemcpy(d_pbo_ptr, d_out_color, width * height * 3 * sizeof(float), cudaMemcpyDeviceToDevice);
     cudaGraphicsUnmapResources(1, &pbo_resource, 0);
 
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
@@ -222,8 +245,16 @@ void GaussianRenderer::save_image(const std::string& filename) const {
     // 1. Allocate host memory to receive the float data
     std::vector<float> h_image(total_elements);
 
-    // 2. Copy data from GPU to CPU
-    cudaError_t err = cudaMemcpy(h_image.data(), d_out_color, byte_size, cudaMemcpyDeviceToHost);
+    // 2. Map PBO and Copy data from GPU to CPU
+    float* d_pbo_ptr;
+    size_t num_bytes;
+    cudaGraphicsResource* res = pbo_resource;
+    cudaGraphicsMapResources(1, &res, 0);
+    cudaGraphicsResourceGetMappedPointer((void**)&d_pbo_ptr, &num_bytes, res);
+
+    cudaError_t err = cudaMemcpy(h_image.data(), d_pbo_ptr, byte_size, cudaMemcpyDeviceToHost);
+    cudaGraphicsUnmapResources(1, &res, 0);
+    
     if (err != cudaSuccess) {
         std::cerr << "CUDA memcpy failed: " << cudaGetErrorString(err) << std::endl;
         return;

@@ -35,11 +35,20 @@ private:
     float *d_rotations = nullptr;
     float *d_colors = nullptr;
     float *d_opacities = nullptr;
+    float *d_cam_params = nullptr;
     
     // CUDA workspace buffers
     char* d_geom_buffer = nullptr;
     char* d_binning_buffer = nullptr;
     char* d_img_buffer = nullptr;
+    
+    size_t allocated_geom_size = 0;
+    size_t allocated_binning_size = 0;
+    size_t allocated_img_size = 0;
+
+    std::function<char*(size_t)> geomAlloc;
+    std::function<char*(size_t)> binningAlloc;
+    std::function<char*(size_t)> imgAlloc;
 
     // CUDA runtime auxiliary objects
     float* d_bg_color = nullptr;
@@ -48,7 +57,6 @@ private:
     float* d_cam_pos = nullptr;
 
     // Output and Interop
-    float *d_out_color = nullptr;
     GLuint pbo = 0;
     GLuint display_texture = 0;
     GLuint quad_vao = 0;

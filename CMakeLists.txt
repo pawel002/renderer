@@ -26,4 +26,6 @@ target_link_libraries(Renderer3D PRIVATE
     CUDA::cudart
 )
 
+target_compile_options(Renderer3D PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
+
 target_include_directories(Renderer3D PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
