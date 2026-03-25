@@ -3,6 +3,7 @@ project(Renderer3D LANGUAGES CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 find_package(glfw3 CONFIG REQUIRED)
 find_package(GLEW REQUIRED)
@@ -26,6 +27,6 @@ target_link_libraries(Renderer3D PRIVATE
     CUDA::cudart
 )
 
-target_compile_options(Renderer3D PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
+target_compile_options(Renderer3D PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math --ptxas-options=-O3>)
 
 target_include_directories(Renderer3D PRIVATE ${CUDAToolkit_INCLUDE_DIRS})

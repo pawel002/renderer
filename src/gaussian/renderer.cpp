@@ -128,7 +128,6 @@ void GaussianRenderer::updateSplats(const std::vector<Splat>& splats) {
 
     std::cout << splats[0] << std::endl;
 
-    // Allocate and copy data to CUDA
     allocateCudaBuffer((void**)&d_means3D, means3D.size() * sizeof(float));
     cudaMemcpy(d_means3D, means3D.data(), means3D.size() * sizeof(float), cudaMemcpyHostToDevice);
 

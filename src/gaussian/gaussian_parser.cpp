@@ -70,16 +70,6 @@ std::vector<Splat> readGaussianSplats(const std::string& file_path) {
     int idxScale1 = getPropertyIndex("scale_1");
     int idxScale2 = getPropertyIndex("scale_2");
 
-    int idxRest0 = getPropertyIndex("f_rest_0");
-    int idxRest1 = getPropertyIndex("f_rest_1");
-    int idxRest2 = getPropertyIndex("f_rest_2");
-    int idxRest3 = getPropertyIndex("f_rest_3");
-    int idxRest4 = getPropertyIndex("f_rest_4");
-    int idxRest5 = getPropertyIndex("f_rest_5");
-    int idxRest6 = getPropertyIndex("f_rest_6");
-    int idxRest7 = getPropertyIndex("f_rest_7");
-    int idxRest8 = getPropertyIndex("f_rest_8");
-
     int idxRot0 = getPropertyIndex("rot_0");
     int idxRot1 = getPropertyIndex("rot_1");
     int idxRot2 = getPropertyIndex("rot_2");
@@ -99,17 +89,6 @@ std::vector<Splat> readGaussianSplats(const std::string& file_path) {
             std::fmax(0.0f, std::fmin(1.0f, vertexData[idxDC1] * SH_C0 + 0.5f)),
             std::fmax(0.0f, std::fmin(1.0f, vertexData[idxDC2] * SH_C0 + 0.5f))
         );
-
-        // splat.color_dc = glm::vec3(vertexData[idxDC0], vertexData[idxDC1], vertexData[idxDC2]);
-        // splat.color_rest.push_back(vertexData[idxRest0]);
-        // splat.color_rest.push_back(vertexData[idxRest3]);
-        // splat.color_rest.push_back(vertexData[idxRest6]);
-        // splat.color_rest.push_back(vertexData[idxRest1]);
-        // splat.color_rest.push_back(vertexData[idxRest4]);
-        // splat.color_rest.push_back(vertexData[idxRest7]);
-        // splat.color_rest.push_back(vertexData[idxRest2]);
-        // splat.color_rest.push_back(vertexData[idxRest5]);
-        // splat.color_rest.push_back(vertexData[idxRest8]);
 
         float opacity = vertexData[idxOpac];
         splat.opacity = 1.0f / (1.0f + std::exp(-opacity));
