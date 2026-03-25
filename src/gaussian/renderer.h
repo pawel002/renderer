@@ -20,7 +20,8 @@ public:
     void resize(int width, int height);
     void render(
         const Camera& camera,
-        int screen_width, int screen_height
+        int screen_width, int screen_height,
+        float scale_modifier = 1.0f
     );
     void save_image(const std::string& filename) const;
     size_t getSplatCount() const;
@@ -34,9 +35,6 @@ private:
     float *d_rotations = nullptr;
     float *d_colors = nullptr;
     float *d_opacities = nullptr;
-    float *d_invdepth = nullptr;
-    float *d_conv3d = nullptr;
-    int *d_radii = nullptr;
     
     // CUDA workspace buffers
     char* d_geom_buffer = nullptr;

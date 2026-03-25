@@ -53,12 +53,8 @@ void GaussianRenderer::resize(int width, int height) {
     if (pbo) glDeleteBuffers(1, &pbo);
     if (display_texture) glDeleteTextures(1, &display_texture);
     if (d_out_color) cudaFree(d_out_color);
-    if (d_invdepth) cudaFree(d_invdepth);
 
     cudaMalloc(&d_out_color, width * height * 3 * sizeof(float));
-
-    cudaMalloc(&d_invdepth, width * height * sizeof(float));
-    cudaMemset(d_invdepth, 0, width * height * sizeof(float));
 
     glGenBuffers(1, &pbo);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
@@ -95,27 +91,16 @@ void GaussianRenderer::updateSplats(const std::vector<Splat>& splats) {
         scales[i*3 + 1] = s.scale.y; 
         scales[i*3 + 2] = s.scale.z;
         
-        rotations[i*4 + 0] = s.rotation.x; 
-        rotations[i*4 + 1] = s.rotation.y; 
-        rotations[i*4 + 2] = s.rotation.z; 
-        rotations[i*4 + 3] = s.rotation.w;
+        rotations[i*4 + 0] = s.rotation.w; 
+        rotations[i*4 + 1] = s.rotation.x; 
+        rotations[i*4 + 2] = s.rotation.y; 
+        rotations[i*4 + 3] = s.rotation.z;
         
-        opacities[i] = 1.0f;
+        opacities[i] = s.opacity;
 
         colors[i*3 + 0] = s.color_dc.x;
         colors[i*3 + 1] = s.color_dc.y;
         colors[i*3 + 2] = s.color_dc.z;
-
-        // colors[i*3 + 3] = s.color_rest[0];
-        // colors[i*3 + 4] = s.color_rest[1];
-        // colors[i*3 + 5] = s.color_rest[2];
-        // colors[i*3 + 6] = s.color_rest[3];
-        // colors[i*3 + 7] = s.color_rest[4];
-        // colors[i*3 + 8] = s.color_rest[5];
-        // colors[i*3 + 9] = s.color_rest[6];
-        // colors[i*3 + 10] = s.color_rest[7];
-        // colors[i*3 + 11] = s.color_rest[8];
-
     }
 
     std::cout << splats[0] << std::endl;
@@ -136,12 +121,6 @@ void GaussianRenderer::updateSplats(const std::vector<Splat>& splats) {
     allocateCudaBuffer((void**)&d_colors, colors.size() * sizeof(float));
     cudaMemcpy(d_colors, colors.data(), colors.size() * sizeof(float), cudaMemcpyHostToDevice);
 
-    allocateCudaBuffer((void**)&d_radii, splat_count * sizeof(int));
-    cudaMemset(d_radii, 0, splat_count * sizeof(int));
-
-    allocateCudaBuffer((void**)&d_conv3d, 6 * splat_count * sizeof(float));
-    cudaMemset(d_conv3d, 1.0f, 6 * splat_count * sizeof(float));
-
     // here is the color variable
     float bg_color[3] = {0.1f, 0.1f, 0.1f};
     allocateCudaBuffer((void**)&d_bg_color, 3 * sizeof(float));
@@ -152,7 +131,7 @@ void GaussianRenderer::updateSplats(const std::vector<Splat>& splats) {
     allocateCudaBuffer((void**)&d_cam_pos, 3 * sizeof(float));
 }
 
-void GaussianRenderer::render(const Camera& camera, int width, int height) {
+void GaussianRenderer::render(const Camera& camera, int width, int height, float scale_modifier) {
     if (splat_count == 0) return;
 
     if (width != current_width || height != current_height) {
@@ -182,22 +161,20 @@ void GaussianRenderer::render(const Camera& camera, int width, int height) {
         d_colors, 
         d_opacities, 
         d_scales, 
-        10000.0f, 
+        scale_modifier, 
         d_rotations, 
-        d_conv3d,
+        nullptr,
         d_view, 
         d_proj_view, 
         d_cam_pos,
-        tan(fov_x * 0.5f), tan(fov_y * 0.5f), 
+        tan(fov_x * 0.5f), tan(fov_y * 0.5f),  
         false, 
         d_out_color, 
-        d_invdepth, 
+        nullptr, 
         false, 
-        d_radii, 
+        nullptr, 
         true
     );
-
-    // save_cuda_image_ppm(d_out_color, width, height, "image.ppm");
 
     float* d_pbo_ptr;
     size_t num_bytes;

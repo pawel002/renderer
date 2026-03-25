@@ -34,6 +34,7 @@ Application::Application()
       first_mouse(true), ui_active(true), show_cameras(true), 
       current_mode(RenderMode::POINT_CLOUD), 
       base_point_size(BASE_POINTS_SIZE), min_point_size(MIN_POINTS_SIZE), max_point_size(MAX_POINTS_SIZE),
+      splat_scale_modifier(1.0f),
       point_count(0), pose_count(0), splats_count(0) {
     
     snprintf(points_path, sizeof(points_path), "%s", POINTS_PATH);
@@ -80,7 +81,8 @@ int Application::run() {
         if (current_mode == RenderMode::GAUSSIAN_SPLAT) {
             gaussian_renderer.render(
                 camera,
-                screen_width, screen_height
+                screen_width, screen_height,
+                splat_scale_modifier
             );
         }
 
@@ -212,6 +214,12 @@ void Application::renderUI() {
             }
 
             ImGui::Text("Splats loaded: %zu", splats_count);
+
+            ImGui::Separator();
+            ImGui::Text("Gaussian Splat Scaling");
+            ImGui::SliderFloat("Scale Modifier", &splat_scale_modifier, 0.5f, 2.0f);
+
+            ImGui::Separator();
 
             if (ImGui::Button("Render Image to PPM")) {
                 gaussian_renderer.save_image("image.ppm");

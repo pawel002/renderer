@@ -37,6 +37,7 @@ private:
     char splats_path[256];
 
     float base_point_size, min_point_size, max_point_size;
+    float splat_scale_modifier;
     size_t point_count, pose_count, splats_count;
 
     bool initGLFW();
