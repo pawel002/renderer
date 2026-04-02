@@ -5,6 +5,7 @@
 
 #include "objects.h"
 #include "../shaders/shader.h"
+#include "../gaussian_utils/gaussian_utils.h"
 
 class Camera;
 class Shader;
@@ -69,5 +70,3 @@ private:
 
     void allocateCudaBuffer(void** ptr, size_t size);
 };
-
-CameraData calculateProjView(const Camera& camera, float fov_x, float fov_y, float znear = 0.01f, float zfar = 100.0f);

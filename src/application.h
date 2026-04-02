@@ -7,6 +7,7 @@
 #include "camera/camera.h"
 #include "point_cloud/renderer.h"
 #include "gaussian/renderer.h"
+#include "temporal_gaussian/renderer.h"
 
 class Application {
 public:
@@ -21,13 +22,15 @@ private:
 
     PointCloudRenderer point_cloud_renderer;
     GaussianRenderer gaussian_renderer;
-    
+    TemporalGaussianRenderer temporal_gaussian_renderer;
+
     float delta_time, last_frame, last_x, last_y;
     bool first_mouse, ui_active, show_cameras;
 
     enum class RenderMode {
         POINT_CLOUD,
-        GAUSSIAN_SPLAT
+        GAUSSIAN_SPLAT,
+        TEMPORAL_GAUSSIAN_SPLAT
     };
 
     RenderMode current_mode;
@@ -36,9 +39,20 @@ private:
     char images_path[256];
     char splats_path[256];
 
+    // Temporal Gaussian paths
+    char temporal_static_path[256];
+    char temporal_dynamic_folder[256];
+
     float base_point_size, min_point_size, max_point_size;
     float splat_scale_modifier;
+    float temporal_scale_modifier;
     size_t point_count, pose_count, splats_count;
+
+    // Temporal playback state
+    bool  temporal_auto_play    = false;
+    float temporal_playback_fps = 24.0f;
+    float temporal_frame_accum  = 0.0f;
+    int   temporal_storage_mode = 0; // 0 = GPU, 1 = RAM
 
     bool initGLFW();
     void initImGui();
@@ -50,6 +64,7 @@ private:
 
     void loadPointsData();
     void loadSplatsData();
+    void loadTemporalScene();
 
     static void mouseCallbackStatic(GLFWwindow* window, double xpos, double ypos);
     static void keyCallbackStatic(GLFWwindow* window, int key, int scancode, int action, int mods);

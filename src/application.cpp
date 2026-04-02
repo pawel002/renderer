@@ -12,9 +12,11 @@
 
 const char* APP_NAME = "3D Renderer";
 
-const char* POINTS_PATH = "data/test2/output2/1/points3D.bin";
-const char* IMAGES_PATH = "data/test2/output2/1/images.bin";
-const char* SPLATS_PATH = "data/gs-test2/point_cloud.ply";
+const char* POINTS_PATH          = "data/test2/output2/1/points3D.bin";
+const char* IMAGES_PATH          = "data/test2/output2/1/images.bin";
+const char* SPLATS_PATH          = "data/gs-test2/point_cloud.ply";
+const char* TEMPORAL_STATIC_PATH = "data/gs-test2/point_cloud.ply";
+const char* TEMPORAL_DYN_FOLDER  = "data/temporal_dynamic";
 
 const int WIDTH = 1280;
 const int HEIGHT = 720;
@@ -25,21 +27,25 @@ const float BASE_POINTS_SIZE = 25.0f;
 const float MIN_POINTS_SIZE = 1.0f;
 const float MAX_POINTS_SIZE = 20.0f;
 
-Application::Application() 
+Application::Application()
     : window(nullptr),
-      camera(glm::vec3(0.0f, 0.0f, 5.0f)), 
+      camera(glm::vec3(0.0f, 0.0f, 5.0f)),
       point_cloud_renderer(),
       gaussian_renderer(),
+      temporal_gaussian_renderer(),
       delta_time(0.0f), last_frame(0.0f), last_x(WIDTH_F / 2.0f), last_y(HEIGHT_F / 2.0f),
-      first_mouse(true), ui_active(true), show_cameras(true), 
-      current_mode(RenderMode::POINT_CLOUD), 
+      first_mouse(true), ui_active(true), show_cameras(true),
+      current_mode(RenderMode::POINT_CLOUD),
       base_point_size(BASE_POINTS_SIZE), min_point_size(MIN_POINTS_SIZE), max_point_size(MAX_POINTS_SIZE),
       splat_scale_modifier(1.0f),
+      temporal_scale_modifier(1.0f),
       point_count(0), pose_count(0), splats_count(0) {
-    
-    snprintf(points_path, sizeof(points_path), "%s", POINTS_PATH);
-    snprintf(images_path, sizeof(images_path), "%s", IMAGES_PATH);
-    snprintf(splats_path, sizeof(splats_path), "%s", SPLATS_PATH);
+
+    snprintf(points_path,           sizeof(points_path),           "%s", POINTS_PATH);
+    snprintf(images_path,           sizeof(images_path),           "%s", IMAGES_PATH);
+    snprintf(splats_path,           sizeof(splats_path),           "%s", SPLATS_PATH);
+    snprintf(temporal_static_path,  sizeof(temporal_static_path),  "%s", TEMPORAL_STATIC_PATH);
+    snprintf(temporal_dynamic_folder, sizeof(temporal_dynamic_folder), "%s", TEMPORAL_DYN_FOLDER);
 }
 
 Application::~Application() {
@@ -51,6 +57,7 @@ int Application::run() {
     
     point_cloud_renderer.init();
     gaussian_renderer.init(WIDTH, HEIGHT);
+    temporal_gaussian_renderer.init(WIDTH, HEIGHT);
 
     while (!glfwWindowShouldClose(window)) {
         float current_frame = static_cast<float>(glfwGetTime());
@@ -83,6 +90,24 @@ int Application::run() {
                 camera,
                 screen_width, screen_height,
                 splat_scale_modifier
+            );
+        }
+
+        if (current_mode == RenderMode::TEMPORAL_GAUSSIAN_SPLAT) {
+            if (temporal_gaussian_renderer.isLoaded() && temporal_auto_play) {
+                temporal_frame_accum += delta_time * temporal_playback_fps;
+                if (temporal_frame_accum >= 1.0f) {
+                    int steps = static_cast<int>(temporal_frame_accum);
+                    temporal_frame_accum -= steps;
+                    int next = (temporal_gaussian_renderer.getCurrentFrame() + steps)
+                               % temporal_gaussian_renderer.getFrameCount();
+                    temporal_gaussian_renderer.setFrame(next);
+                }
+            }
+            temporal_gaussian_renderer.render(
+                camera,
+                screen_width, screen_height,
+                temporal_scale_modifier
             );
         }
 
@@ -151,6 +176,14 @@ void Application::loadSplatsData() {
     splats_count = splats.size();
 }
 
+void Application::loadTemporalScene() {
+    auto mode = (temporal_storage_mode == 0)
+                    ? TemporalGaussianRenderer::StorageMode::GPU
+                    : TemporalGaussianRenderer::StorageMode::RAM;
+    temporal_gaussian_renderer.loadScene(temporal_static_path, temporal_dynamic_folder, mode);
+    temporal_frame_accum = 0.0f;
+}
+
 void Application::processInput() {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -208,7 +241,7 @@ void Application::renderUI() {
             current_mode = RenderMode::GAUSSIAN_SPLAT;
 
             ImGui::InputText("Splats path", splats_path, IM_ARRAYSIZE(splats_path));
-            
+
             if (ImGui::Button("Load Gaussian Splat Data")) {
                 loadSplatsData();
             }
@@ -224,9 +257,92 @@ void Application::renderUI() {
             if (ImGui::Button("Render Image to PPM")) {
                 gaussian_renderer.save_image("image.ppm");
             }
-            
+
             ImGui::EndTabItem();
         }
+
+        if (ImGui::BeginTabItem("Temporal Gaussian")) {
+            current_mode = RenderMode::TEMPORAL_GAUSSIAN_SPLAT;
+
+            ImGui::InputText("Static PLY path",     temporal_static_path,    IM_ARRAYSIZE(temporal_static_path));
+            ImGui::InputText("Dynamic frames folder", temporal_dynamic_folder, IM_ARRAYSIZE(temporal_dynamic_folder));
+
+            ImGui::Text("Storage mode:");
+            ImGui::SameLine();
+            ImGui::RadioButton("GPU (fast, high VRAM)", &temporal_storage_mode, 0);
+            ImGui::SameLine();
+            ImGui::RadioButton("RAM (lower VRAM)",      &temporal_storage_mode, 1);
+
+            if (ImGui::Button("Load Temporal Scene")) {
+                loadTemporalScene();
+            }
+
+            if (temporal_gaussian_renderer.isLoaded()) {
+                ImGui::Separator();
+                ImGui::Text("Static splats:  %zu", temporal_gaussian_renderer.getStaticCount());
+                ImGui::Text("Dynamic splats: %zu / frame", temporal_gaussian_renderer.getDynamicCount());
+                ImGui::Text("Total splats:   %zu", temporal_gaussian_renderer.getTotalSplatCount());
+                ImGui::Text("Frames:         %d",  temporal_gaussian_renderer.getFrameCount());
+
+                ImGui::Separator();
+                ImGui::Text("Playback");
+
+                // Frame slider
+                int frame = temporal_gaussian_renderer.getCurrentFrame();
+                int max_frame = temporal_gaussian_renderer.getFrameCount() - 1;
+                if (ImGui::SliderInt("Frame", &frame, 0, max_frame)) {
+                    temporal_auto_play = false;
+                    temporal_frame_accum = 0.0f;
+                    temporal_gaussian_renderer.setFrame(frame);
+                }
+
+                // Previous / Next buttons
+                ImGui::BeginDisabled(frame <= 0);
+                if (ImGui::Button("< Prev")) {
+                    temporal_auto_play = false;
+                    temporal_gaussian_renderer.setFrame(frame - 1);
+                }
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                ImGui::BeginDisabled(frame >= max_frame);
+                if (ImGui::Button("Next >")) {
+                    temporal_auto_play = false;
+                    temporal_gaussian_renderer.setFrame(frame + 1);
+                }
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+
+                // Play / Pause toggle
+                if (temporal_auto_play) {
+                    if (ImGui::Button("Pause")) {
+                        temporal_auto_play   = false;
+                        temporal_frame_accum = 0.0f;
+                    }
+                } else {
+                    if (ImGui::Button(" Play")) {
+                        temporal_auto_play   = true;
+                        temporal_frame_accum = 0.0f;
+                    }
+                }
+
+                ImGui::SliderFloat("FPS", &temporal_playback_fps, 1.0f, 120.0f, "%.0f fps");
+
+                ImGui::Separator();
+                ImGui::Text("Rendering");
+                ImGui::SliderFloat("Scale Modifier##T", &temporal_scale_modifier, 0.5f, 2.0f);
+
+                ImGui::Separator();
+                if (ImGui::Button("Save Frame to PPM")) {
+                    temporal_gaussian_renderer.save_image("temporal_frame.ppm");
+                }
+            } else {
+                ImGui::Separator();
+                ImGui::TextDisabled("No scene loaded.");
+            }
+
+            ImGui::EndTabItem();
+        }
+
         ImGui::EndTabBar();
     }
 

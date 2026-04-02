@@ -12,7 +12,7 @@ find_package(imgui CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(CUDAToolkit REQUIRED)
 
-file(GLOB_RECURSE SRC_FILES "src/*.cpp" "src/*.cu")
+file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS "src/*.cpp" "src/*.cu")
 
 add_executable(Renderer3D main.cpp ${SRC_FILES})
 
