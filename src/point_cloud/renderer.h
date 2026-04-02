@@ -1,3 +1,6 @@
+#pragma once
+
+#include <memory>
 #include <vector>
 #include <glm/glm.hpp>
 
@@ -5,7 +8,6 @@
 #include "../shaders/shader.h"
 
 class Camera;
-class Shader;
 
 class PointCloudRenderer {
 public:
@@ -21,19 +23,19 @@ public:
         Camera& camera,
         float screen_width, float screen_height,
         float base_point_size, float min_point_size, float max_point_size,
-        bool show_cameras    
+        bool show_cameras
     ) const;
 
     size_t getPointCount() const;
     size_t getPoseCount() const;
 
 private:
-    Shader* shader;
+    std::unique_ptr<Shader> shader;
 
-    unsigned int points_VAO, points_VBO;
-    unsigned int camera_VAO, camera_VBO, camera_instance_VBO;
+    unsigned int points_VAO = 0, points_VBO = 0;
+    unsigned int camera_VAO = 0, camera_VBO = 0, camera_instance_VBO = 0;
 
-    size_t point_count, pose_count;
+    size_t point_count = 0, pose_count = 0;
 
     void initCameraGhostGeometry();
     void renderPoints(float base_size, float min_size, float max_size) const;

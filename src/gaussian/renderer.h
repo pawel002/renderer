@@ -1,3 +1,7 @@
+#pragma once
+
+#include <functional>
+#include <memory>
 #include <vector>
 #include <glm/glm.hpp>
 #include <cuda_runtime.h>
@@ -8,7 +12,6 @@
 #include "../gaussian_utils/gaussian_utils.h"
 
 class Camera;
-class Shader;
 
 class GaussianRenderer {
 public:
@@ -25,10 +28,10 @@ public:
         float scale_modifier = 1.0f
     );
     void save_image(const std::string& filename) const;
-    size_t getSplatCount() const;
+    size_t getSplatCount() const { return splat_count; }
 
 private:
-    Shader* shader = nullptr;
+    std::unique_ptr<Shader> shader;
 
     // CUDA Device Pointers (Splat Data)
     float *d_means3D = nullptr;

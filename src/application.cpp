@@ -206,13 +206,35 @@ void Application::renderUI() {
     ImGui::NewFrame();
 
     ImGui::Begin("3D Renderer Controls");
-    ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-    ImGui::Separator();
-    ImGui::Text("Press TAB to toggle UI / Camera Fly Mode");
+
+    // Performance info
+    ImGui::Text("FPS: %.1f (%.2f ms)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
+    int fb_w, fb_h;
+    glfwGetFramebufferSize(window, &fb_w, &fb_h);
+    ImGui::Text("Resolution: %d x %d", fb_w, fb_h);
+
     ImGui::Separator();
 
-    glm::vec3 camPos = camera.position; 
+    // Camera section
+    glm::vec3 camPos = camera.position;
     ImGui::Text("Camera Pos: X: %.2f  Y: %.2f  Z: %.2f", camPos.x, camPos.y, camPos.z);
+    ImGui::SliderFloat("Move Speed", &camera.movement_speed, 0.5f, 50.0f);
+    ImGui::SliderFloat("Mouse Sensitivity", &camera.mouse_sensitivity, 0.01f, 0.5f);
+    if (ImGui::Button("Reset Camera")) {
+        camera.reset();
+    }
+
+    ImGui::Separator();
+
+    if (ImGui::TreeNode("Controls")) {
+        ImGui::BulletText("TAB - Toggle UI / Fly Mode");
+        ImGui::BulletText("W/A/S/D - Move");
+        ImGui::BulletText("Space/Shift - Up/Down");
+        ImGui::BulletText("Q/E - Roll");
+        ImGui::BulletText("Mouse - Look around");
+        ImGui::BulletText("ESC - Quit");
+        ImGui::TreePop();
+    }
     
     if (ImGui::BeginTabBar("RenderModes")) {
         if (ImGui::BeginTabItem("Point Cloud")) {

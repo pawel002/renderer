@@ -51,8 +51,6 @@ TemporalGaussianRenderer::TemporalGaussianRenderer() {
 }
 
 TemporalGaussianRenderer::~TemporalGaussianRenderer() {
-    if (shader) delete shader;
-
     if (d_means3D)    cudaFree(d_means3D);
     if (d_scales)     cudaFree(d_scales);
     if (d_rotations)  cudaFree(d_rotations);
@@ -83,8 +81,8 @@ TemporalGaussianRenderer::~TemporalGaussianRenderer() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 void TemporalGaussianRenderer::init(int width, int height) {
-    shader = new Shader("src/shaders/gaussian/vertex.glsl",
-                        "src/shaders/gaussian/fragment.glsl");
+    shader = std::make_unique<Shader>("src/shaders/gaussian/vertex.glsl",
+                                     "src/shaders/gaussian/fragment.glsl");
     glGenVertexArrays(1, &quad_vao);
     resize(width, height);
 }
@@ -183,6 +181,9 @@ void TemporalGaussianRenderer::uploadDynamicFrames(const std::vector<std::vector
     size_t stride4 = dynamic_count * 4;
     size_t stride1 = dynamic_count;
 
+    // Reuse temp vectors across frames to avoid repeated allocations
+    std::vector<float> m, sc, ro, co, op;
+
     if (storage_mode == StorageMode::GPU) {
         allocateCudaBuffer((void**)&d_all_means3D,   (size_t)num_frames * stride3 * sizeof(float));
         allocateCudaBuffer((void**)&d_all_scales,    (size_t)num_frames * stride3 * sizeof(float));
@@ -191,7 +192,6 @@ void TemporalGaussianRenderer::uploadDynamicFrames(const std::vector<std::vector
         allocateCudaBuffer((void**)&d_all_opacities, (size_t)num_frames * stride1 * sizeof(float));
 
         for (int f = 0; f < num_frames; f++) {
-            std::vector<float> m, sc, ro, co, op;
             splatsToArrays(frames[f], m, sc, ro, co, op);
 
             cudaMemcpy(d_all_means3D   + f * stride3, m.data(),  stride3 * sizeof(float), cudaMemcpyHostToDevice);
@@ -209,7 +209,6 @@ void TemporalGaussianRenderer::uploadDynamicFrames(const std::vector<std::vector
         h_all_opacities.resize((size_t)num_frames * stride1);
 
         for (int f = 0; f < num_frames; f++) {
-            std::vector<float> m, sc, ro, co, op;
             splatsToArrays(frames[f], m, sc, ro, co, op);
 
             std::copy(m.begin(),  m.end(),  h_all_means3D.begin()   + f * stride3);
@@ -413,7 +412,7 @@ void TemporalGaussianRenderer::render(const Camera& camera, int width, int heigh
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
     shader->use();
-    glUniform1i(glGetUniformLocation(shader->ID, "renderTex"), 0);
+    glUniform1i(shader->getUniform("renderTex"), 0);
     glBindVertexArray(quad_vao);
     glDisable(GL_DEPTH_TEST);
     glDrawArrays(GL_TRIANGLES, 0, 3);

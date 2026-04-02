@@ -6,15 +6,9 @@
 #include "renderer.h"
 #include "../camera/camera.h"
 
-PointCloudRenderer::PointCloudRenderer() :
-    shader(nullptr),
-    points_VAO(0), points_VBO(0),
-    camera_VAO(0), camera_VBO(0), camera_instance_VBO(0),
-    point_count(0), pose_count(0) { }
+PointCloudRenderer::PointCloudRenderer() = default;
 
 PointCloudRenderer::~PointCloudRenderer() {
-    if (shader) delete shader;
-
     if (points_VAO) {
         glDeleteVertexArrays(1, &points_VAO);
         glDeleteBuffers(1, &points_VBO);
@@ -23,12 +17,13 @@ PointCloudRenderer::~PointCloudRenderer() {
     if (camera_VAO) {
         glDeleteVertexArrays(1, &camera_VAO);
         glDeleteBuffers(1, &camera_VBO);
+        glDeleteBuffers(1, &camera_instance_VBO);
     }
 }
 
 void PointCloudRenderer::init() {
-    shader = new Shader(
-        "src/shaders/point-cloud/vertex.glsl", 
+    shader = std::make_unique<Shader>(
+        "src/shaders/point-cloud/vertex.glsl",
         "src/shaders/point-cloud/fragment.glsl"
     );
 
@@ -127,8 +122,8 @@ void PointCloudRenderer::render(
     if (!shader) return;
 
     shader->use();
-    glUniformMatrix4fv(glGetUniformLocation(shader->ID, "view"), 1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(glGetUniformLocation(shader->ID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glUniformMatrix4fv(shader->getUniform("view"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(shader->getUniform("projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
     if (point_count > 0)
         renderPoints(base_point_size, min_point_size, max_point_size);
@@ -139,23 +134,23 @@ void PointCloudRenderer::render(
 
 void PointCloudRenderer::renderPoints(float base_size, float min_size, float max_size) const {
     glm::mat4 model = glm::mat4(1.0f);
-    glUniformMatrix4fv(glGetUniformLocation(shader->ID, "model"), 1, GL_FALSE, glm::value_ptr(model));
-    glUniform1i(glGetUniformLocation(shader->ID, "useUniformColor"), 0);
-    glUniform1i(glGetUniformLocation(shader->ID, "isInstanced"), 0);
-    
-    glUniform1f(glGetUniformLocation(shader->ID, "basePointSize"), base_size);
-    glUniform1f(glGetUniformLocation(shader->ID, "minPointSize"), min_size);
-    glUniform1f(glGetUniformLocation(shader->ID, "maxPointSize"), max_size);
+    glUniformMatrix4fv(shader->getUniform("model"), 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(shader->getUniform("useUniformColor"), 0);
+    glUniform1i(shader->getUniform("isInstanced"), 0);
+
+    glUniform1f(shader->getUniform("basePointSize"), base_size);
+    glUniform1f(shader->getUniform("minPointSize"), min_size);
+    glUniform1f(shader->getUniform("maxPointSize"), max_size);
 
     glBindVertexArray(points_VAO);
     glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(point_count));
 }
 
 void PointCloudRenderer::renderCameraPoses() const {
-    glUniform1i(glGetUniformLocation(shader->ID, "useUniformColor"), 1);
-    glUniform1i(glGetUniformLocation(shader->ID, "isInstanced"), 1);
-    glUniform3f(glGetUniformLocation(shader->ID, "uniformColor"), 1.0f, 0.0f, 0.0f);
-    
+    glUniform1i(shader->getUniform("useUniformColor"), 1);
+    glUniform1i(shader->getUniform("isInstanced"), 1);
+    glUniform3f(shader->getUniform("uniformColor"), 1.0f, 0.0f, 0.0f);
+
     glBindVertexArray(camera_VAO);
     glDrawArraysInstanced(GL_LINES, 0, 16, static_cast<GLsizei>(pose_count));
 }

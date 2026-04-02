@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 #include <string>
 #include <functional>
@@ -12,7 +13,6 @@
 #include "../gaussian_utils/gaussian_utils.h"
 
 class Camera;
-class Shader;
 
 class TemporalGaussianRenderer {
 public:
@@ -45,7 +45,7 @@ public:
     bool   isLoaded()           const { return num_frames > 0; }
 
 private:
-    Shader* shader = nullptr;
+    std::unique_ptr<Shader> shader;
 
     StorageMode storage_mode = StorageMode::GPU;
 

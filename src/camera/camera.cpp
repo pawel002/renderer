@@ -2,11 +2,19 @@
 
 #include "camera.h"
 
-Camera::Camera(glm::vec3 position) : 
-    position(position), front(glm::vec3(0.0f, 0.0f, 1.0f)), 
+Camera::Camera(glm::vec3 position) :
+    position(position), front(glm::vec3(0.0f, 0.0f, 1.0f)),
     movement_speed(5.0f), mouse_sensitivity(0.1f), roll_speed(2.0f) {
-    position = position;
-    world_up = glm::vec3(0.0f, -1.0f, 0.0f); 
+    world_up = glm::vec3(0.0f, -1.0f, 0.0f);
+    yaw = 90.0f;
+    pitch = 0.0f;
+    updateCameraVectors();
+}
+
+void Camera::reset(glm::vec3 pos) {
+    position = pos;
+    front = glm::vec3(0.0f, 0.0f, 1.0f);
+    world_up = glm::vec3(0.0f, -1.0f, 0.0f);
     yaw = 90.0f;
     pitch = 0.0f;
     updateCameraVectors();

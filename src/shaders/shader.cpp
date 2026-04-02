@@ -56,8 +56,20 @@ Shader::Shader(const char* vert_path, const char* frag_path) {
     glDeleteShader(fragment);
 }
 
+Shader::~Shader() {
+    if (ID) glDeleteProgram(ID);
+}
+
 void Shader::use() {
     glUseProgram(ID);
+}
+
+GLint Shader::getUniform(const std::string& name) {
+    auto it = uniform_cache.find(name);
+    if (it != uniform_cache.end()) return it->second;
+    GLint loc = glGetUniformLocation(ID, name.c_str());
+    uniform_cache[name] = loc;
+    return loc;
 }
 
 void Shader::checkCompileErrors(GLuint shader, const string& type) {

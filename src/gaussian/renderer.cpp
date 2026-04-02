@@ -5,6 +5,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <fstream>
+#include <memory>
 
 #include "objects.h"
 #include "renderer.h"
@@ -42,13 +43,13 @@ GaussianRenderer::GaussianRenderer() {
 }
 
 GaussianRenderer::~GaussianRenderer() {
-    if (shader) delete shader;
-
     if (d_means3D) cudaFree(d_means3D);
     if (d_scales) cudaFree(d_scales);
     if (d_rotations) cudaFree(d_rotations);
     if (d_colors) cudaFree(d_colors);
     if (d_opacities) cudaFree(d_opacities);
+    if (d_bg_color) cudaFree(d_bg_color);
+    if (d_cam_params) cudaFree(d_cam_params);
     if (d_geom_buffer) cudaFree(d_geom_buffer);
     if (d_binning_buffer) cudaFree(d_binning_buffer);
     if (d_img_buffer) cudaFree(d_img_buffer);
@@ -60,7 +61,7 @@ GaussianRenderer::~GaussianRenderer() {
 }
 
 void GaussianRenderer::init(int width, int height) {
-    shader = new Shader("src/shaders/gaussian/vertex.glsl", "src/shaders/gaussian/fragment.glsl");
+    shader = std::make_unique<Shader>("src/shaders/gaussian/vertex.glsl", "src/shaders/gaussian/fragment.glsl");
     glGenVertexArrays(1, &quad_vao);
     resize(width, height);
 }
@@ -126,8 +127,6 @@ void GaussianRenderer::updateSplats(const std::vector<Splat>& splats) {
         colors[i*3 + 1] = s.color_dc.y;
         colors[i*3 + 2] = s.color_dc.z;
     }
-
-    std::cout << splats[0] << std::endl;
 
     allocateCudaBuffer((void**)&d_means3D, means3D.size() * sizeof(float));
     cudaMemcpy(d_means3D, means3D.data(), means3D.size() * sizeof(float), cudaMemcpyHostToDevice);
@@ -215,10 +214,10 @@ void GaussianRenderer::render(const Camera& camera, int width, int height, float
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
     shader->use();
-    glUniform1i(glGetUniformLocation(shader->ID, "renderTex"), 0);
-    
+    glUniform1i(shader->getUniform("renderTex"), 0);
+
     glBindVertexArray(quad_vao);
-    glDisable(GL_DEPTH_TEST); 
+    glDisable(GL_DEPTH_TEST);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glEnable(GL_DEPTH_TEST);
 }
